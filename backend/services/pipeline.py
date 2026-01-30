@@ -10,12 +10,14 @@ def process_bill(path):
     ocr = extract_text(original)  # IMPORTANT: original image
 
     confidence = evaluate(ocr)
-    errors = detect(ocr)
-    decision = decide(confidence, errors)
+    issue_result = detect(ocr)
+    decision = decide(confidence, issue_result)
 
     return {
-        "items": ocr,
-        "confidence": confidence,
-        "errors": errors,
-        "decision": decision
+    "items": ocr,
+    "confidence": confidence,
+    "errors": issue_result["errors"],
+    "suggestions": issue_result["suggestions"],
+    "decision": decision
     }
+

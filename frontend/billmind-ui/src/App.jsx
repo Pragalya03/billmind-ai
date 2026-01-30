@@ -66,8 +66,18 @@ function App() {
             </div>
           )}
 
+          {/* Suggested Corrections */}
+          {result.suggestions && result.suggestions.length > 0 && (
+            <div style={{ color: "green", marginTop: 10 }}>
+              <h4>💡 Suggested Corrections</h4>
+              {result.suggestions.map((s, i) => (
+                <p key={i}>{s}</p>
+              ))}
+            </div>
+          )}
+
           {/* OCR Results */}
-          <h4>🔍 OCR Extracted Text</h4>
+          <h4 style={{ marginTop: 20 }}>🔍 OCR Extracted Text</h4>
 
           {result.items.map((i, idx) => (
             <div
@@ -102,7 +112,7 @@ function App() {
           ))}
 
           {/* Confidence */}
-          <p>
+          <p style={{ marginTop: 15 }}>
             📊 Average Confidence:{" "}
             <b>{result.confidence.toFixed(2)}</b>
           </p>
