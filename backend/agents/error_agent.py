@@ -1,30 +1,57 @@
-def detect(items):
+def detect(semantic_items):
     errors = []
     suggestions = []
 
-    numbers = []
-    for i in items:
-        if i["text"].replace(".", "").isdigit():
-            numbers.append(float(i["text"]))
+    items = []
+    current_item = None
 
-    if len(numbers) >= 3:
-        total = max(numbers)
-        others = [n for n in numbers if n != total]
+    marked_total = None
 
-        for i in range(len(others)):
-            for j in range(i + 1, len(others)):
-                if abs(others[i] * others[j] - total) < 1:
-                    suggestions.append(
-                        f"Suggested correction: {int(others[i])} × {int(others[j])} = {int(total)}"
-                    )
+    # Step 1: Identify marked total
+    for s in semantic_items:
+        if s["label"] == "TOTAL_VALUE":
+            marked_total = float(s["text"])
 
-        subtotal = sum(others)
-        if abs(subtotal - total) > 1:
+    # Step 2: Build line items from middle section
+    middle = [s for s in semantic_items if 0.25 < s["y_norm"] < 0.7]
+
+    buffer = []
+
+    for s in middle:
+        if s["label"] == "ITEM":
+            if buffer:
+                buffer = []
+            current_item = s["text"]
+        elif s["label"] == "NUMBER":
+            buffer.append(float(s["text"]))
+
+            # assume qty then price
+            if len(buffer) == 2 and current_item:
+                qty, price = buffer
+                items.append({
+                    "item": current_item,
+                    "qty": qty,
+                    "price": price
+                })
+                buffer = []
+                current_item = None
+
+    # Step 3: Compute expected total
+    expected_total = sum(i["qty"] * i["price"] for i in items)
+
+    # Step 4: Validate
+    if marked_total is not None:
+        if abs(expected_total - marked_total) > 1:
             errors.append(
-                f"Possible total mismatch: detected total {total}, subtotal {subtotal}"
+                f"Total mismatch: calculated {expected_total}, marked total {marked_total}"
+            )
+            suggestions.append(
+                f"Calculated total based on items: {expected_total}"
             )
 
     return {
         "errors": errors,
-        "suggestions": suggestions
+        "suggestions": suggestions,
+        "computed_total": expected_total,
+        "marked_total": marked_total
     }
