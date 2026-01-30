@@ -1,5 +1,7 @@
 import easyocr
+from agents.learning_agent import apply_learning
 
+# Initialize EasyOCR reader once (important for performance)
 reader = easyocr.Reader(
     ['en'],
     gpu=False,
@@ -17,9 +19,15 @@ def extract_text(image):
     )
 
     extracted = []
+
     for bbox, text, confidence in results:
+        cleaned_text = text.strip()
+
+        # Apply user-assisted learning (self-improving behavior)
+        learned_text = apply_learning(cleaned_text)
+
         extracted.append({
-            "text": text.strip(),
+            "text": learned_text,
             "confidence": float(confidence)
         })
 
