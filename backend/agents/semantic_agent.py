@@ -1,37 +1,40 @@
 from agents.layout_utils import bbox_center
 
-TOTAL_KEYWORDS = ["total", "amt", "amount", "sum", "grand"]
+TOTAL_WORDS = ["total", "amt", "amount", "sum", "grand"]
 
+def semantic_label(items):
+    ys = [bbox_center(i["bbox"])[1] for i in items]
+    top, bottom = min(ys), max(ys)
+    height = bottom - top
 
-def semantic_label(ocr_items):
-    y_positions = [bbox_center(i["bbox"])[1] for i in ocr_items]
-    page_top = min(y_positions)
-    page_bottom = max(y_positions)
-    page_height = page_bottom - page_top
+    labeled = []
 
-    semantic = []
-
-    for i in ocr_items:
+    for i in items:
         text = i["text"]
         conf = i["confidence"]
         bbox = i["bbox"]
 
         _, y = bbox_center(bbox)
-        y_norm = (y - page_top) / page_height
+        y_norm = (y - top) / height
 
         label = "UNKNOWN"
 
-        if any(k in text.lower() for k in TOTAL_KEYWORDS):
+        if any(w in text.lower() for w in TOTAL_WORDS):
             label = "TOTAL_LABEL"
         elif text.replace(".", "").isdigit():
+            num = float(text)
             if y_norm > 0.7:
                 label = "TOTAL_VALUE"
+            elif num <= 50:
+                label = "QTY"
             else:
-                label = "NUMBER"
+                label = "PRICE"
         elif text.isalpha() and 0.25 < y_norm < 0.7:
             label = "ITEM"
+        elif y_norm < 0.25:
+            label = "HEADER"
 
-        semantic.append({
+        labeled.append({
             "text": text,
             "confidence": conf,
             "bbox": bbox,
@@ -39,4 +42,4 @@ def semantic_label(ocr_items):
             "y_norm": round(y_norm, 2)
         })
 
-    return semantic
+    return labeled

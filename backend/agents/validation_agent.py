@@ -4,13 +4,21 @@ def validate(table, marked_total):
     if marked_total is None:
         return {
             "status": "REVIEW",
-            "message": "Total not found on bill"
+            "message": "Handwritten total not found"
         }
 
-    if abs(calculated - marked_total) < 1:
+    diff = abs(calculated - marked_total)
+
+    if diff < 1:
         return {
             "status": "MATCH",
             "message": "Calculated total matches handwritten total"
+        }
+
+    if diff <= 5:
+        return {
+            "status": "PARTIAL_MATCH",
+            "message": "Minor difference detected, possibly tax or rounding"
         }
 
     return {

@@ -1,5 +1,10 @@
 from agents.layout_utils import bbox_center
+import re
 
+def clean_text(text):
+    text = text.replace("Rs.", "").replace("/-", "")
+    text = re.sub(r"\s+", "", text)
+    return text
 
 def normalize(ocr_items, y_thresh=15):
     ocr_items = sorted(ocr_items, key=lambda x: bbox_center(x["bbox"])[1])
@@ -25,9 +30,12 @@ def normalize(ocr_items, y_thresh=15):
         lines.append(current)
 
     normalized = []
+
     for line in lines:
         line = sorted(line, key=lambda x: bbox_center(x["bbox"])[0])
         text = " ".join(t["text"] for t in line)
+        text = clean_text(text)
+
         conf = sum(t["confidence"] for t in line) / len(line)
 
         normalized.append({
