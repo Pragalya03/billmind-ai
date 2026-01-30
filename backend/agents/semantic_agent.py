@@ -2,6 +2,7 @@ from agents.layout_utils import bbox_center
 
 TOTAL_KEYWORDS = ["total", "amt", "amount", "sum", "grand"]
 
+
 def semantic_label(ocr_items):
     y_positions = [bbox_center(i["bbox"])[1] for i in ocr_items]
     page_top = min(y_positions)

@@ -4,118 +4,82 @@ import axios from "axios"
 function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   const upload = async (e) => {
     try {
       setLoading(true)
+      setError(null)
+
       const form = new FormData()
       form.append("file", e.target.files[0])
 
-      const res = await axios.post(
-        "http://localhost:8000/upload",
-        form,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      )
+      const res = await axios.post("http://localhost:8000/upload", form)
+      console.log("BACKEND RESPONSE:", res.data)
 
       setResult(res.data)
     } catch (err) {
-      alert("Upload failed. Check backend.")
       console.error(err)
+      setError("Upload or processing failed")
     } finally {
       setLoading(false)
     }
   }
 
-  const correct = async (original, corrected) => {
-    try {
-      await axios.post("http://localhost:8000/correct", {
-        original,
-        corrected
-      })
-      alert("Correction learned! Re-upload to see improvement.")
-    } catch (err) {
-      alert("Correction failed.")
-    }
-  }
-
   return (
-    <div style={{ padding: 30, fontFamily: "Arial" }}>
-      <h2>📄 BillMind AI – Handwritten Bill Processor</h2>
+    <div style={{ padding: 20, fontFamily: "Arial" }}>
+      <h2>📄 Bill Processing System</h2>
 
       <input type="file" onChange={upload} />
 
-      {loading && <p>⏳ Processing bill...</p>}
+      {loading && <p>⏳ Processing…</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
 
       {result && (
         <>
           <hr />
 
-          {/* Workflow Decision */}
-          <h3>
-            🧠 Workflow Decision:{" "}
-            <span style={{ color: "blue" }}>{result.decision}</span>
-          </h3>
+          {/* HEADER */}
+          <h3>🏪 Shop Details</h3>
+          <p><b>Name:</b> {result.header?.shop_name || "Not detected"}</p>
+          <p><b>Address:</b> {result.header?.address || "Not detected"}</p>
 
-          {/* Errors */}
-          {result.errors && result.errors.length > 0 && (
-            <div style={{ color: "orange" }}>
-              <h4>⚠️ Detected Issues</h4>
-              {result.errors.map((e, i) => (
-                <p key={i}>{e}</p>
-              ))}
-            </div>
+          {/* TABLE */}
+          <h3>🧾 Items</h3>
+
+          {Array.isArray(result.table) && result.table.length > 0 ? (
+            <table border="1" cellPadding="8">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Unit Price</th>
+                  <th>Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.table.map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.item}</td>
+                    <td>{row.quantity}</td>
+                    <td>{row.unit_price}</td>
+                    <td>{row.line_total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>⚠️ No table items detected</p>
           )}
 
-          {/* Suggested Corrections */}
-          {result.suggestions && result.suggestions.length > 0 && (
-            <div style={{ color: "green", marginTop: 10 }}>
-              <h4>💡 Suggested Corrections</h4>
-              {result.suggestions.map((s, i) => (
-                <p key={i}>{s}</p>
-              ))}
-            </div>
-          )}
+          {/* TOTAL */}
+          <h3>💰 Total</h3>
+          <p><b>Handwritten Total:</b> {result.marked_total ?? "Not detected"}</p>
 
-          {/* OCR Results */}
-          <h4 style={{ marginTop: 20 }}>🔍 OCR Extracted Text</h4>
-
-          {result.items.map((i, idx) => (
-            <div
-              key={idx}
-              style={{
-                marginBottom: 8,
-                padding: 6,
-                borderBottom: "1px solid #ddd"
-              }}
-            >
-              <span
-                style={{
-                  color: i.confidence < 0.7 ? "red" : "black",
-                  fontWeight: i.confidence < 0.7 ? "bold" : "normal"
-                }}
-              >
-                {i.text} ({i.confidence.toFixed(2)})
-              </span>
-
-              {i.confidence < 0.7 && (
-                <button
-                  style={{ marginLeft: 10 }}
-                  onClick={() => {
-                    const c = prompt("Correct text:", i.text)
-                    if (c) correct(i.text, c)
-                  }}
-                >
-                  Correct
-                </button>
-              )}
-            </div>
-          ))}
-
-          {/* Confidence */}
-          <p style={{ marginTop: 15 }}>
-            📊 Average Confidence:{" "}
-            <b>{result.confidence.toFixed(2)}</b>
-          </p>
+          {/* VALIDATION */}
+          <h3>🧠 Validation</h3>
+          <p><b>Status:</b> {result.validation?.status}</p>
+          <p>{result.validation?.message}</p>
         </>
       )}
     </div>
