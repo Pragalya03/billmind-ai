@@ -28,7 +28,8 @@ def extract_text(image):
 
         extracted.append({
             "text": learned_text,
-            "confidence": float(confidence)
+            "confidence": float(confidence),
+            "bbox":[[int(x), int(y)] for x, y in bbox]
         })
 
     print("🟢 EASYOCR OUTPUT:", extracted)

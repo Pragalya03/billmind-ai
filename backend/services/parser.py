@@ -14,7 +14,7 @@ def parse_bill(ocr_results):
                 "item": name,
                 "qty": int(qty),
                 "price": float(price),
-                "confidence": conf
+                "confidence": float(conf)
             })
 
     return items
