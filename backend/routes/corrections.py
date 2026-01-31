@@ -1,14 +1,13 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
-from agents.learning_agent import learn
+from agents.learning_agent import learn, delete_word
 
 router = APIRouter()
 
-class Correction(BaseModel):
-    original: str
-    corrected: str
-
 @router.post("/correct")
-def submit_correction(correction: Correction):
-    learn(correction.original, correction.corrected)
+def correct(payload: dict):
+    if payload.get("action") == "delete":
+        delete_word(payload["original"])
+        return {"status": "deleted"}
+
+    learn(payload["original"], payload["corrected"])
     return {"status": "learned"}

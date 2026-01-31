@@ -1,24 +1,37 @@
 def validate(table, detected_total):
-    # Only include rows that have a computed line_total
-    valid_rows = [row for row in table if row["line_total"] is not None]
+    # Sum only valid line totals
+    line_totals = [
+        row["line_total"]
+        for row in table
+        if row.get("line_total") is not None
+    ]
 
-    calculated = sum(row["line_total"] for row in valid_rows)
+    calculated_total = round(sum(line_totals), 2)
 
+    # If no detected total from OCR
     if detected_total is None:
         return {
-            "status": "UNKNOWN",
-            "message": "Total not detected in bill"
+            "status": "CALCULATED_ONLY",
+            "calculated_total": calculated_total,
+            "message": f"Final total calculated as {calculated_total}"
         }
 
-    if abs(calculated - detected_total) < 1:
+    # Compare detected vs calculated
+    if abs(calculated_total - detected_total) < 1:
         return {
             "status": "MATCH",
-            "message": f"Calculated total {calculated} matches detected total"
+            "calculated_total": calculated_total,
+            "message": (
+                f"Calculated total {calculated_total} "
+                f"matches detected total {detected_total}"
+            )
         }
 
     return {
         "status": "MISMATCH",
+        "calculated_total": calculated_total,
         "message": (
-            f"Calculated total {calculated} does not match detected total {detected_total}"
+            f"Calculated total {calculated_total} "
+            f"does not match detected total {detected_total}"
         )
     }

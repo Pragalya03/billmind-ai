@@ -18,10 +18,14 @@ def extract_text(image):
     for bbox, text, confidence in results:
         corrected_text, forced_conf = apply_learning(text.strip())
 
+        if corrected_text is None:
+            continue  # 🔥 deleted word
+
         extracted.append({
             "text": corrected_text,
             "confidence": forced_conf if forced_conf is not None else float(confidence),
             "bbox": bbox
         })
+
 
     return extracted

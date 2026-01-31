@@ -48,6 +48,14 @@ function App() {
     await upload(file)
   }
 
+  const deleteWord = async (original) => {
+    await axios.post("http://localhost:8000/correct", {
+      original,
+      action: "delete"
+    })
+    await upload(file)
+  }
+
   const updateCell = (rowIndex, field, value) => {
     const updated = structuredClone(result)
     const num = Number(value)
@@ -80,11 +88,26 @@ function App() {
                   <span style={{ color: "red" }}>
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
-                  <button onClick={() => confirmWord(r.text)} style={{ marginLeft: 8 }}>
+
+                  <button
+                    style={{ marginLeft: 8 }}
+                    onClick={() => confirmWord(r.text)}
+                  >
                     Confirm
                   </button>
-                  <button onClick={() => editWord(r.text)} style={{ marginLeft: 4 }}>
+
+                  <button
+                    style={{ marginLeft: 4 }}
+                    onClick={() => editWord(r.text)}
+                  >
                     Edit
+                  </button>
+
+                  <button
+                    style={{ marginLeft: 4, color: "red" }}
+                    onClick={() => deleteWord(r.text)}
+                  >
+                    Delete
                   </button>
                 </div>
               ))}
@@ -127,7 +150,6 @@ function App() {
                   >
                     <td>{row.item || "—"}</td>
 
-                    {/* QTY */}
                     <td>
                       {row.quantity != null ? (
                         row.quantity
@@ -143,7 +165,6 @@ function App() {
                       )}
                     </td>
 
-                    {/* UNIT PRICE */}
                     <td>
                       {row.unit_price != null ? (
                         row.unit_price
@@ -159,10 +180,8 @@ function App() {
                       )}
                     </td>
 
-                    {/* TOTAL */}
                     <td>{row.line_total != null ? row.line_total : "—"}</td>
 
-                    {/* STATUS */}
                     <td>
                       {incomplete ? "⚠️ Needs input" : "✅ Complete"}
                     </td>

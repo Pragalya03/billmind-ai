@@ -19,7 +19,7 @@ def build_table(semantic_items, y_threshold=0.08):
     print("\n--- TABLE AGENT DEBUG ---")
     print("BODY INPUT:")
     for i in body:
-        print(f"  {i['text']} | y={float(i['y_norm']):.2f} | label={i['label']}")
+        print(f"  {i['text']} | x={i['bbox'][0][0]:.1f} | y={float(i['y_norm']):.2f}")
 
     # -------- ROW CLUSTERING --------
     rows = []
@@ -38,31 +38,46 @@ def build_table(semantic_items, y_threshold=0.08):
         print(f"\nRow {idx + 1}:")
         for cell in row:
             print(
-                f"  {cell['text']} | x={cell['bbox'][0][0]:.1f} "
-                f"| y={float(cell['y_norm']):.2f} | label={cell['label']}"
+                f"  {cell['text']} | x={cell['bbox'][0][0]:.1f} | y={float(cell['y_norm']):.2f}"
             )
 
-    # -------- BUILD TABLE (OPTION A) --------
+    # -------- BUILD TABLE (NUMERIC PRIORITY LOGIC) --------
     table = []
 
-    for row in rows:
+    for row_idx, row in enumerate(rows):
+        print(f"\n--- PROCESSING ROW {row_idx + 1} ---")
+
         row = sorted(row, key=lambda x: x["bbox"][0][0])
 
         item_text = None
-        qty = None
-        price = None
+        numbers = []
 
         for cell in row:
             text = cell["text"]
 
             if not is_number(text) and item_text is None:
                 item_text = text
-            elif is_number(text) and qty is None:
-                qty = float(clean_number(text))
-            elif is_number(text) and qty is not None and price is None:
-                price = float(clean_number(text))
+                print(f"ITEM detected: {text}")
 
-        # 🔥 KEY CHANGE: do NOT require qty & price
+            elif is_number(text):
+                value = float(clean_number(text))
+                numbers.append(value)
+                print(f"NUMBER detected: {value}")
+
+        qty = None
+        price = None
+
+        if len(numbers) >= 2:
+            numbers = sorted(numbers)
+            qty = numbers[0]
+            price = numbers[-1]
+            print(f"ASSIGNED → qty={qty}, price={price}")
+        elif len(numbers) == 1:
+            price = numbers[0]
+            print(f"ASSIGNED → price={price} (qty missing)")
+
+        print(f"ROW RESULT → item={item_text}, qty={qty}, price={price}")
+
         if item_text:
             table.append({
                 "item": match_product(item_text),
