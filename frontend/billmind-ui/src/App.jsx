@@ -34,7 +34,7 @@ function App() {
       original,
       corrected: original
     })
-    await upload(file) // 🔥 reprocess bill
+    await upload(file)
   }
 
   const editWord = async (original) => {
@@ -45,12 +45,14 @@ function App() {
       original,
       corrected
     })
-    await upload(file) // 🔥 reprocess bill
+    await upload(file)
   }
 
   const updateCell = (rowIndex, field, value) => {
     const updated = structuredClone(result)
-    updated.table[rowIndex][field] = Number(value)
+    const num = Number(value)
+
+    updated.table[rowIndex][field] = isNaN(num) ? null : num
 
     const r = updated.table[rowIndex]
     if (r.quantity != null && r.unit_price != null) {
@@ -61,7 +63,7 @@ function App() {
   }
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h2>📄 BillMind AI</h2>
 
       <input type="file" onChange={handleFile} />
@@ -78,8 +80,12 @@ function App() {
                   <span style={{ color: "red" }}>
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
-                  <button onClick={() => confirmWord(r.text)}>Confirm</button>
-                  <button onClick={() => editWord(r.text)}>Edit</button>
+                  <button onClick={() => confirmWord(r.text)} style={{ marginLeft: 8 }}>
+                    Confirm
+                  </button>
+                  <button onClick={() => editWord(r.text)} style={{ marginLeft: 4 }}>
+                    Edit
+                  </button>
                 </div>
               ))}
             </>
@@ -87,58 +93,98 @@ function App() {
 
           {/* STORE */}
           <h3>🏪 Store</h3>
-          <p>{result.header?.shop_name || "Not detected"}</p>
-          <p>{result.header?.address || "Not detected"}</p>
+          <p><b>Name:</b> {result.header?.shop_name || "Not detected"}</p>
+          <p><b>Address:</b> {result.header?.address || "Not detected"}</p>
 
           {/* TABLE */}
           <h3>🧾 Items</h3>
-          <table border="1" cellPadding="8">
+          <table
+            border="1"
+            cellPadding="8"
+            style={{ borderCollapse: "collapse", width: "100%" }}
+          >
             <thead>
               <tr>
                 <th>Item</th>
                 <th>Qty</th>
                 <th>Unit Price</th>
-                <th>Total</th>
+                <th>Line Total</th>
+                <th>Status</th>
               </tr>
             </thead>
+
             <tbody>
-              {result.table.map((row, idx) => (
-                <tr key={idx}>
-                  <td>{row.item}</td>
+              {result.table.map((row, idx) => {
+                const incomplete =
+                  row.quantity == null || row.unit_price == null
 
-                  <td>
-                    {row.quantity != null ? (
-                      row.quantity
-                    ) : (
-                      <input
-                        type="number"
-                        placeholder="?"
-                        onBlur={(e) => updateCell(idx, "quantity", e.target.value)}
-                      />
-                    )}
-                  </td>
+                return (
+                  <tr
+                    key={idx}
+                    style={{
+                      backgroundColor: incomplete ? "#fff3cd" : "#e6fffa"
+                    }}
+                  >
+                    <td>{row.item || "—"}</td>
 
-                  <td>
-                    {row.unit_price != null ? (
-                      row.unit_price
-                    ) : (
-                      <input
-                        type="number"
-                        placeholder="?"
-                        onBlur={(e) => updateCell(idx, "unit_price", e.target.value)}
-                      />
-                    )}
-                  </td>
+                    {/* QTY */}
+                    <td>
+                      {row.quantity != null ? (
+                        row.quantity
+                      ) : (
+                        <input
+                          type="number"
+                          placeholder="?"
+                          style={{ width: 60 }}
+                          onBlur={(e) =>
+                            updateCell(idx, "quantity", e.target.value)
+                          }
+                        />
+                      )}
+                    </td>
 
-                  <td>{row.line_total ?? "—"}</td>
-                </tr>
-              ))}
+                    {/* UNIT PRICE */}
+                    <td>
+                      {row.unit_price != null ? (
+                        row.unit_price
+                      ) : (
+                        <input
+                          type="number"
+                          placeholder="?"
+                          style={{ width: 80 }}
+                          onBlur={(e) =>
+                            updateCell(idx, "unit_price", e.target.value)
+                          }
+                        />
+                      )}
+                    </td>
+
+                    {/* TOTAL */}
+                    <td>{row.line_total != null ? row.line_total : "—"}</td>
+
+                    {/* STATUS */}
+                    <td>
+                      {incomplete ? "⚠️ Needs input" : "✅ Complete"}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
 
+          {/* TOTAL */}
+          <h3>💰 Grand Total</h3>
+          <p>Detected Total: {result.marked_total ?? "Not detected"}</p>
+          <p>{result.validation?.message}</p>
+
           {/* FINAL CONFIDENCE */}
           <h3>📊 Final Bill Confidence</h3>
-          <p style={{ fontWeight: "bold" }}>
+          <p
+            style={{
+              fontWeight: "bold",
+              color: result.final_confidence >= 0.85 ? "green" : "orange"
+            }}
+          >
             {result.final_confidence}
           </p>
         </>
