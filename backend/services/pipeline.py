@@ -13,66 +13,57 @@ from agents.review_agent import collect_review_items
 
 
 def process_bill(path):
-    # ----------------------------
-    # Image + OCR
-    # ----------------------------
     image, _ = preprocess_image(path)
+    image_shape = image.shape
 
     raw_ocr = extract_text(image)
     normalized = normalize(raw_ocr)
 
-    # ----------------------------
-    # LOW-CONFIDENCE WORDS
-    # ----------------------------
     review_items = collect_review_items(normalized)
 
-    # ----------------------------
-    # FINAL BILL CONFIDENCE
-    # ----------------------------
     confidences = [i["confidence"] for i in normalized]
-    final_confidence = (
-        round(sum(confidences) / len(confidences), 2)
-        if confidences else 0.0
-    )
+    final_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
 
-    # ----------------------------
-    # TABLE GRID DETECTION
-    # ----------------------------
     table_grid = detect_table_grid(image)
 
-    for item in normalized:
-        # attach grid so downstream agents can use it
-        item["table_grid"] = table_grid
+    # 🔥 padding around table bbox (VERY IMPORTANT)
+    PAD_X = 20
+    PAD_Y = 20
 
-        # extract word position
-        x = item["bbox"][0][0]
-        y = item["bbox"][0][1]
+    for item in normalized:
+        item["table_grid"] = table_grid
+        item["image_shape"] = image_shape
+
+        # pixel center
+        cx = (item["bbox"][0][0] + item["bbox"][2][0]) / 2
+        cy = (item["bbox"][0][1] + item["bbox"][2][1]) / 2
 
         if table_grid:
             x1, y1, x2, y2 = table_grid["bbox"]
 
-            if x1 <= x <= x2 and y1 <= y <= y2:
+            # 🔥 padded containment check
+            if (
+                x1 - PAD_X <= cx <= x2 + PAD_X and
+                y1 - PAD_Y <= cy <= y2 + PAD_Y
+            ):
                 item["region"] = "TABLE"
-            elif y < y1:
+            elif cy < y1:
                 item["region"] = "HEADER"
             else:
                 item["region"] = "FOOTER"
         else:
             item["region"] = "UNKNOWN"
 
-    # ----------------------------
-    # EXISTING PIPELINE (UNCHANGED)
-    # ----------------------------
     segmented = segment_layout(normalized)
     semantic = semantic_label(segmented)
 
-    # 🔥 RE-ATTACH GRID AFTER SEMANTIC LABELING
+    # reattach metadata
     for item in semantic:
         item["table_grid"] = table_grid
+        item["image_shape"] = image_shape
 
     header = extract_header(semantic)
     table = build_table(semantic)
-
     marked_total = extract_total(semantic)
     validation = validate(table, marked_total)
 
