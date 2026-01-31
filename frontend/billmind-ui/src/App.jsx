@@ -7,6 +7,7 @@ function App() {
   const [file, setFile] = useState(null)
 
   const upload = async (f) => {
+    if (!f) return
     try {
       setLoading(true)
       const form = new FormData()
@@ -16,6 +17,7 @@ function App() {
       setResult(res.data)
     } catch (e) {
       alert("Upload failed")
+      console.error(e)
     } finally {
       setLoading(false)
     }
@@ -32,10 +34,10 @@ function App() {
       original,
       corrected: original
     })
-    upload(file)
+    await upload(file) // 🔥 reprocess bill
   }
 
-  const correctWord = async (original) => {
+  const editWord = async (original) => {
     const corrected = prompt("Correct text:", original)
     if (!corrected) return
 
@@ -43,42 +45,54 @@ function App() {
       original,
       corrected
     })
-    upload(file)
+    await upload(file) // 🔥 reprocess bill
+  }
+
+  const updateCell = (rowIndex, field, value) => {
+    const updated = structuredClone(result)
+    updated.table[rowIndex][field] = Number(value)
+
+    const r = updated.table[rowIndex]
+    if (r.quantity != null && r.unit_price != null) {
+      r.line_total = Number((r.quantity * r.unit_price).toFixed(2))
+    }
+
+    setResult(updated)
   }
 
   return (
     <div style={{ padding: 20 }}>
       <h2>📄 BillMind AI</h2>
-      <input type="file" onChange={handleFile} />
 
+      <input type="file" onChange={handleFile} />
       {loading && <p>⏳ Processing...</p>}
 
       {result && (
         <>
-          {/* STEP 1: LOW CONFIDENCE CONFIRMATION */}
+          {/* LOW CONFIDENCE WORDS */}
           {result.review_items?.length > 0 && (
             <>
               <h3>🧐 Confirm Low-Confidence Words</h3>
               {result.review_items.map((r, i) => (
-                <div key={i}>
+                <div key={i} style={{ marginBottom: 6 }}>
                   <span style={{ color: "red" }}>
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
                   <button onClick={() => confirmWord(r.text)}>Confirm</button>
-                  <button onClick={() => correctWord(r.text)}>Edit</button>
+                  <button onClick={() => editWord(r.text)}>Edit</button>
                 </div>
               ))}
             </>
           )}
 
-          {/* STEP 2: HEADER */}
+          {/* STORE */}
           <h3>🏪 Store</h3>
-          <p>{result.header?.shop_name}</p>
-          <p>{result.header?.address}</p>
+          <p>{result.header?.shop_name || "Not detected"}</p>
+          <p>{result.header?.address || "Not detected"}</p>
 
-          {/* STEP 3: TABLE */}
+          {/* TABLE */}
           <h3>🧾 Items</h3>
-          <table border="1" cellPadding="6">
+          <table border="1" cellPadding="8">
             <thead>
               <tr>
                 <th>Item</th>
@@ -88,29 +102,46 @@ function App() {
               </tr>
             </thead>
             <tbody>
-              {result.table?.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.item}</td>
-                  <td>{r.quantity}</td>
-                  <td>{r.unit_price}</td>
-                  <td>{r.line_total}</td>
+              {result.table.map((row, idx) => (
+                <tr key={idx}>
+                  <td>{row.item}</td>
+
+                  <td>
+                    {row.quantity != null ? (
+                      row.quantity
+                    ) : (
+                      <input
+                        type="number"
+                        placeholder="?"
+                        onBlur={(e) => updateCell(idx, "quantity", e.target.value)}
+                      />
+                    )}
+                  </td>
+
+                  <td>
+                    {row.unit_price != null ? (
+                      row.unit_price
+                    ) : (
+                      <input
+                        type="number"
+                        placeholder="?"
+                        onBlur={(e) => updateCell(idx, "unit_price", e.target.value)}
+                      />
+                    )}
+                  </td>
+
+                  <td>{row.line_total ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {/* STEP 4: TOTAL CHECK */}
-          <h3>💰 Grand Total</h3>
-          <p>Detected: {result.marked_total}</p>
-          <p>{result.validation?.message}</p>
-
+          {/* FINAL CONFIDENCE */}
           <h3>📊 Final Bill Confidence</h3>
-          <p style={{ fontWeight: "bold", color: result.final_confidence >= 0.85 ? "green" : "orange" }}>
+          <p style={{ fontWeight: "bold" }}>
             {result.final_confidence}
           </p>
-
         </>
-        
       )}
     </div>
   )

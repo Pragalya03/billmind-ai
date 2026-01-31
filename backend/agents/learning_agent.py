@@ -1,3 +1,5 @@
+# backend/agents/learning_agent.py
+
 memory = {}
 
 def learn(original, corrected):
@@ -9,5 +11,5 @@ def learn(original, corrected):
 def apply_learning(text):
     entry = memory.get(text.lower())
     if entry:
-        return entry["text"], entry["confidence"]
+        return entry["text"], 1.0
     return text, None
