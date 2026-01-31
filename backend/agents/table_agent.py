@@ -10,18 +10,78 @@ def is_number(text):
     except:
         return False
 
-def build_table(semantic_items, y_threshold=0.08):
-    body = [
-        i for i in semantic_items
-        if i["label"] not in ["HEADER", "TOTAL_LABEL", "TOTAL_VALUE"]
-    ]
 
-    print("\n--- TABLE AGENT DEBUG ---")
-    print("BODY INPUT:")
-    for i in body:
-        print(f"  {i['text']} | x={i['bbox'][0][0]:.1f} | y={float(i['y_norm']):.2f}")
+def build_table(items, y_threshold=0.08):
+    table_items = [i for i in items if i.get("region") == "TABLE"]
+
+    # Fallback if no table detected
+    if not table_items:
+        return _fallback_table(items, y_threshold)
+
+    # -------- COLUMN GUIDED --------
+    xs = [i["bbox"][0][0] for i in table_items]
+    min_x, max_x = min(xs), max(xs)
+    width = max_x - min_x
+
+    columns = {
+        "ITEM": (min_x, min_x + 0.45 * width),
+        "QTY": (min_x + 0.45 * width, min_x + 0.65 * width),
+        "PRICE": (min_x + 0.65 * width, max_x),
+    }
+
+    for i in table_items:
+        x = i["bbox"][0][0]
+        for col, (x1, x2) in columns.items():
+            if x1 <= x <= x2:
+                i["column"] = col
 
     # -------- ROW CLUSTERING --------
+    rows = []
+    for item in table_items:
+        placed = False
+        for row in rows:
+            if abs(item["y_norm"] - row[0]["y_norm"]) < y_threshold:
+                row.append(item)
+                placed = True
+                break
+        if not placed:
+            rows.append([item])
+
+    table = []
+    for row in rows:
+        data = {"item": None, "quantity": None, "unit_price": None}
+
+        for cell in row:
+            text = cell["text"]
+            col = cell.get("column")
+
+            if col == "ITEM" and data["item"] is None:
+                data["item"] = match_product(text)
+            elif col == "QTY" and is_number(text):
+                data["quantity"] = float(clean_number(text))
+            elif col == "PRICE" and is_number(text):
+                data["unit_price"] = float(clean_number(text))
+
+        if data["item"]:
+            if data["quantity"] and data["unit_price"]:
+                data["line_total"] = round(
+                    data["quantity"] * data["unit_price"], 2
+                )
+            else:
+                data["line_total"] = None
+
+            table.append(data)
+
+    return table
+
+
+# ---------------- FALLBACK ----------------
+def _fallback_table(items, y_threshold):
+    body = [
+        i for i in items
+        if i["label"] not in ["HEADER", "ADDRESS", "TOTAL_LABEL", "TOTAL_VALUE"]
+    ]
+
     rows = []
     for item in body:
         placed = False
@@ -33,65 +93,28 @@ def build_table(semantic_items, y_threshold=0.08):
         if not placed:
             rows.append([item])
 
-    print("\nFORMED ROWS:")
-    for idx, row in enumerate(rows):
-        print(f"\nRow {idx + 1}:")
-        for cell in row:
-            print(
-                f"  {cell['text']} | x={cell['bbox'][0][0]:.1f} | y={float(cell['y_norm']):.2f}"
-            )
-
-    # -------- BUILD TABLE (NUMERIC PRIORITY LOGIC) --------
     table = []
+    for row in rows:
+        nums = []
+        name = None
 
-    for row_idx, row in enumerate(rows):
-        print(f"\n--- PROCESSING ROW {row_idx + 1} ---")
+        for c in row:
+            if not is_number(c["text"]) and name is None:
+                name = c["text"]
+            elif is_number(c["text"]):
+                nums.append(float(clean_number(c["text"])))
 
-        row = sorted(row, key=lambda x: x["bbox"][0][0])
+        qty = price = None
+        if len(nums) >= 2:
+            nums.sort()
+            qty, price = nums[0], nums[-1]
 
-        item_text = None
-        numbers = []
-
-        for cell in row:
-            text = cell["text"]
-
-            if not is_number(text) and item_text is None:
-                item_text = text
-                print(f"ITEM detected: {text}")
-
-            elif is_number(text):
-                value = float(clean_number(text))
-                numbers.append(value)
-                print(f"NUMBER detected: {value}")
-
-        qty = None
-        price = None
-
-        if len(numbers) >= 2:
-            numbers = sorted(numbers)
-            qty = numbers[0]
-            price = numbers[-1]
-            print(f"ASSIGNED → qty={qty}, price={price}")
-        elif len(numbers) == 1:
-            price = numbers[0]
-            print(f"ASSIGNED → price={price} (qty missing)")
-
-        print(f"ROW RESULT → item={item_text}, qty={qty}, price={price}")
-
-        if item_text:
+        if name:
             table.append({
-                "item": match_product(item_text),
+                "item": match_product(name),
                 "quantity": qty,
                 "unit_price": price,
-                "line_total": round(qty * price, 2)
-                if qty is not None and price is not None
-                else None
+                "line_total": qty * price if qty and price else None
             })
-
-    print("\nFINAL TABLE ROWS:")
-    for r in table:
-        print(r)
-
-    print("--- END TABLE AGENT DEBUG ---\n")
 
     return table
