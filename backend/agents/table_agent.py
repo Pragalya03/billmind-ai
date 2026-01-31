@@ -1,61 +1,87 @@
-from collections import defaultdict
 from agents.product_agent import match_product
 
-STOPWORDS = ["total", "amt", "amount", "rate", "qty", "price"]
+def clean_number(text):
+    return text.replace("o", "0").replace("O", "0")
 
 def is_number(text):
     try:
-        float(text)
+        float(clean_number(text))
         return True
     except:
         return False
 
-def build_table(semantic_items, y_tol=0.03):
-    # consider only body-like tokens
-    body = [i for i in semantic_items if i["label"] not in ["HEADER", "TOTAL_LABEL", "TOTAL_VALUE"]]
+def build_table(semantic_items, y_threshold=0.08):
+    # Exclude header and footer
+    body = [
+        i for i in semantic_items
+        if i["label"] not in ["HEADER", "TOTAL_LABEL", "TOTAL_VALUE"]
+    ]
 
-    rows = defaultdict(list)
+    print("\n--- TABLE AGENT DEBUG ---")
+    print("BODY INPUT:")
     for i in body:
-        key = round(i["y_norm"] / y_tol)
-        rows[key].append(i)
+        print(f"  {i['text']} | y={float(i['y_norm']):.2f} | label={i['label']}")
 
+    # -------------------------
+    # ROW CLUSTERING (PROXIMITY)
+    # -------------------------
+    rows = []
+    for item in body:
+        placed = False
+        for row in rows:
+            if abs(item["y_norm"] - row[0]["y_norm"]) < y_threshold:
+                row.append(item)
+                placed = True
+                break
+        if not placed:
+            rows.append([item])
+
+    # -------------------------
+    # DEBUG: SHOW FORMED ROWS
+    # -------------------------
+    print("\nFORMED ROWS:")
+    for idx, row in enumerate(rows):
+        print(f"\nRow {idx + 1}:")
+        for cell in row:
+            x = cell["bbox"][0][0]
+            y = float(cell["y_norm"])
+            print(f"  {cell['text']} | x={x:.1f} | y={y:.2f} | label={cell['label']}")
+
+    # -------------------------
+    # BUILD TABLE
+    # -------------------------
     table = []
 
-    for _, row in rows.items():
-        # sort left → right
+    for row in rows:
+        # Sort left → right
         row = sorted(row, key=lambda x: x["bbox"][0][0])
 
-        item_parts = []
+        item_text = None
         qty = None
         price = None
 
         for cell in row:
             text = cell["text"]
 
-            # ITEM: first meaningful non-numeric tokens on the left
-            if not is_number(text) and text.lower() not in STOPWORDS:
-                item_parts.append(text)
-                continue
+            if not is_number(text) and item_text is None:
+                item_text = text
+            elif is_number(text) and qty is None:
+                qty = float(clean_number(text))
+            elif is_number(text) and qty is not None and price is None:
+                price = float(clean_number(text))
 
-            # Quantity: small number near item
-            if is_number(text) and qty is None:
-                qty = float(text)
-                continue
-
-            # Price: next number
-            if is_number(text) and qty is not None and price is None:
-                price = float(text)
-                break
-
-        if item_parts and qty is not None and price is not None:
-            raw_item = " ".join(item_parts)
-            corrected_item = match_product(raw_item)
-
+        if item_text and qty is not None and price is not None:
             table.append({
-                "item": corrected_item,
+                "item": match_product(item_text),
                 "quantity": qty,
                 "unit_price": price,
                 "line_total": round(qty * price, 2)
             })
+
+    print("\nFINAL TABLE ROWS:")
+    for r in table:
+        print(r)
+
+    print("--- END TABLE AGENT DEBUG ---\n")
 
     return table
