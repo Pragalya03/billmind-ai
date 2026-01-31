@@ -35,6 +35,7 @@ def process_bill(path):
         "table": table,
         "marked_total": marked_total,
         "validation": validation,
-        "review_items": review_items,
-        "final_confidence": final_confidence
+        "final_confidence": final_confidence,
+        "review_items": review_items
     }
+

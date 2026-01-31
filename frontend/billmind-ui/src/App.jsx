@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import axios from "axios"
 
 function App() {
@@ -70,6 +70,18 @@ function App() {
     setResult(updated)
   }
 
+  // 🔥 FRONTEND FINAL TOTAL (SOURCE OF TRUTH)
+  const frontendTotal = useMemo(() => {
+    if (!result?.table) return 0
+
+    const total = result.table
+      .filter((r) => r.line_total != null)
+      .reduce((sum, r) => sum + r.line_total, 0)
+
+    console.log("🧮 FRONTEND CALCULATED TOTAL:", total)
+    return total.toFixed(2)
+  }, [result])
+
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h2>📄 BillMind AI</h2>
@@ -89,26 +101,9 @@ function App() {
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
 
-                  <button
-                    style={{ marginLeft: 8 }}
-                    onClick={() => confirmWord(r.text)}
-                  >
-                    Confirm
-                  </button>
-
-                  <button
-                    style={{ marginLeft: 4 }}
-                    onClick={() => editWord(r.text)}
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    style={{ marginLeft: 4, color: "red" }}
-                    onClick={() => deleteWord(r.text)}
-                  >
-                    Delete
-                  </button>
+                  <button onClick={() => confirmWord(r.text)}>Confirm</button>
+                  <button onClick={() => editWord(r.text)}>Edit</button>
+                  <button onClick={() => deleteWord(r.text)}>Delete</button>
                 </div>
               ))}
             </>
@@ -121,11 +116,7 @@ function App() {
 
           {/* TABLE */}
           <h3>🧾 Items</h3>
-          <table
-            border="1"
-            cellPadding="8"
-            style={{ borderCollapse: "collapse", width: "100%" }}
-          >
+          <table border="1" cellPadding="8" width="100%">
             <thead>
               <tr>
                 <th>Item</th>
@@ -135,7 +126,6 @@ function App() {
                 <th>Status</th>
               </tr>
             </thead>
-
             <tbody>
               {result.table.map((row, idx) => {
                 const incomplete =
@@ -148,62 +138,72 @@ function App() {
                       backgroundColor: incomplete ? "#fff3cd" : "#e6fffa"
                     }}
                   >
-                    <td>{row.item || "—"}</td>
-
+                    <td>{row.item}</td>
                     <td>
                       {row.quantity != null ? (
                         row.quantity
                       ) : (
                         <input
                           type="number"
-                          placeholder="?"
-                          style={{ width: 60 }}
                           onBlur={(e) =>
                             updateCell(idx, "quantity", e.target.value)
                           }
                         />
                       )}
                     </td>
-
                     <td>
                       {row.unit_price != null ? (
                         row.unit_price
                       ) : (
                         <input
                           type="number"
-                          placeholder="?"
-                          style={{ width: 80 }}
                           onBlur={(e) =>
                             updateCell(idx, "unit_price", e.target.value)
                           }
                         />
                       )}
                     </td>
-
-                    <td>{row.line_total != null ? row.line_total : "—"}</td>
-
-                    <td>
-                      {incomplete ? "⚠️ Needs input" : "✅ Complete"}
-                    </td>
+                    <td>{row.line_total ?? "—"}</td>
+                    <td>{incomplete ? "⚠️ Needs input" : "✅ Complete"}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
 
-          {/* TOTAL */}
-          <h3>💰 Grand Total</h3>
-          <p>Detected Total: {result.marked_total ?? "Not detected"}</p>
-          <p>{result.validation?.message}</p>
+          {/* FINAL TOTAL (FRONTEND SOURCE OF TRUTH) */}
+          <h3>💰 Final Bill Total</h3>
+          <p style={{ fontSize: 18, fontWeight: "bold" }}>
+            ₹ {frontendTotal}
+          </p>
 
-          {/* FINAL CONFIDENCE */}
+          {/* OCR CHECK */}
+          <p>
+            <b>Detected (OCR) Total:</b>{" "}
+            {result.marked_total ?? "Not detected"}
+          </p>
+
+          {/* VALIDATION MESSAGE (FRONTEND-AWARE) */}
+          {result.marked_total != null && (
+            <p
+              style={{
+                fontWeight: "bold",
+                color:
+                  Math.abs(frontendTotal - result.marked_total) < 1
+                    ? "green"
+                    : "red"
+              }}
+            >
+              {Math.abs(frontendTotal - result.marked_total) < 1
+                ? `Final total ${frontendTotal} matches the detected handwritten total ${result.marked_total}.`
+                : `Final total ${frontendTotal} does NOT match the detected handwritten total ${result.marked_total}.`}
+            </p>
+          )}
+
+
+          {/* CONFIDENCE */}
           <h3>📊 Final Bill Confidence</h3>
-          <p
-            style={{
-              fontWeight: "bold",
-              color: result.final_confidence >= 0.85 ? "green" : "orange"
-            }}
-          >
+          <p style={{ fontWeight: "bold" }}>
             {result.final_confidence}
           </p>
         </>
