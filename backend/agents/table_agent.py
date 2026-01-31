@@ -1,7 +1,9 @@
 from agents.product_agent import match_product
 
+
 def clean_number(text):
     return text.replace("o", "0").replace("O", "0")
+
 
 def is_number(text):
     try:
@@ -11,71 +13,118 @@ def is_number(text):
         return False
 
 
+def inside_center(word_bbox, cell_bbox, tol=5):
+    # use CENTER of OCR bbox with tolerance
+    cx = (word_bbox[0][0] + word_bbox[2][0]) / 2
+    cy = (word_bbox[0][1] + word_bbox[2][1]) / 2
+    x1, y1, x2, y2 = cell_bbox
+
+    return (
+        x1 - tol <= cx <= x2 + tol and
+        y1 - tol <= cy <= y2 + tol
+    )
+
+
 def build_table(items, y_threshold=0.08):
     table_items = [i for i in items if i.get("region") == "TABLE"]
+    grid = next((i.get("table_grid") for i in items if i.get("table_grid")), None)
 
-    # Fallback if no table detected
-    if not table_items:
-        return _fallback_table(items, y_threshold)
+    print("\n--- TABLE AGENT DEBUG ---")
+    print("Grid detected:", bool(grid))
 
-    # -------- COLUMN GUIDED --------
-    xs = [i["bbox"][0][0] for i in table_items]
-    min_x, max_x = min(xs), max(xs)
-    width = max_x - min_x
+    # ---------------- GRID-BASED PARSING ----------------
+    if grid:
+        vlines = grid["vertical_lines"]
+        hlines = grid["horizontal_lines"]
 
-    columns = {
-        "ITEM": (min_x, min_x + 0.45 * width),
-        "QTY": (min_x + 0.45 * width, min_x + 0.65 * width),
-        "PRICE": (min_x + 0.65 * width, max_x),
-    }
+        print("Vertical lines:", vlines)
+        print("Horizontal lines:", hlines)
 
-    for i in table_items:
-        x = i["bbox"][0][0]
-        for col, (x1, x2) in columns.items():
-            if x1 <= x <= x2:
-                i["column"] = col
+        # build cells
+        cells = []
+        for r in range(len(hlines) - 1):
+            for c in range(len(vlines) - 1):
+                cells.append({
+                    "row": r,
+                    "col": c,
+                    "bbox": (vlines[c], hlines[r], vlines[c+1], hlines[r+1]),
+                    "words": []
+                })
 
-    # -------- ROW CLUSTERING --------
-    rows = []
-    for item in table_items:
-        placed = False
-        for row in rows:
-            if abs(item["y_norm"] - row[0]["y_norm"]) < y_threshold:
-                row.append(item)
-                placed = True
-                break
-        if not placed:
-            rows.append([item])
+        print("Total cells:", len(cells))
 
-    table = []
-    for row in rows:
-        data = {"item": None, "quantity": None, "unit_price": None}
+        # assign words to cells
+        for word in table_items:
+            assigned = False
+            for cell in cells:
+                if inside_center(word["bbox"], cell["bbox"]):
+                    cell["words"].append(word)
+                    assigned = True
+                    print(
+                        f"WORD '{word['text']}' → cell (r={cell['row']}, c={cell['col']})"
+                    )
+                    break
 
-        for cell in row:
-            text = cell["text"]
-            col = cell.get("column")
-
-            if col == "ITEM" and data["item"] is None:
-                data["item"] = match_product(text)
-            elif col == "QTY" and is_number(text):
-                data["quantity"] = float(clean_number(text))
-            elif col == "PRICE" and is_number(text):
-                data["unit_price"] = float(clean_number(text))
-
-        if data["item"]:
-            if data["quantity"] and data["unit_price"]:
-                data["line_total"] = round(
-                    data["quantity"] * data["unit_price"], 2
+            if not assigned:
+                print(
+                    f"❌ WORD '{word['text']}' not assigned to any cell"
                 )
-            else:
-                data["line_total"] = None
 
-            table.append(data)
+        # assemble rows
+        rows = {}
+        for cell in cells:
+            if cell["words"]:
+                rows.setdefault(cell["row"], []).append(cell)
 
-    return table
+        table = []
+
+        for r, row_cells in sorted(rows.items()):
+            data = {
+                "item": None,
+                "quantity": None,
+                "unit_price": None,
+                "line_total": None
+            }
+
+            print(f"\nProcessing row {r}")
+
+            for cell in row_cells:
+                col = cell["col"]
+                text = " ".join(w["text"] for w in cell["words"])
+
+                print(f"  Cell col={col} text='{text}'")
+
+                if col == 1 and text:
+                    data["item"] = match_product(text)
+
+                elif col == 2 and is_number(text):
+                    data["quantity"] = float(clean_number(text))
+
+                elif col == 3 and is_number(text):
+                    data["unit_price"] = float(clean_number(text))
+
+            if data["item"]:
+                if data["quantity"] is not None and data["unit_price"] is not None:
+                    data["line_total"] = round(
+                        data["quantity"] * data["unit_price"], 2
+                    )
+                table.append(data)
+
+            print("Parsed row:", data)
+
+        print("\nFINAL TABLE:", table)
+        print("--- END TABLE AGENT DEBUG ---\n")
+
+        return table
+
+    # ---------------- FALLBACK PARSING ----------------
+    print("⚠️ No grid → using fallback parsing")
+    return _fallback_table(items, y_threshold)
 
 
-# ---------------- FALLBACK ----------------
+# =====================================================
+# FALLBACK TABLE LOGIC (HEURISTIC)
+# =====================================================
 def _fallback_table(items, y_threshold):
     body = [
         i for i in items
@@ -94,9 +143,10 @@ def _fallback_table(items, y_threshold):
             rows.append([item])
 
     table = []
+
     for row in rows:
-        nums = []
         name = None
+        nums = []
 
         for c in row:
             if not is_number(c["text"]) and name is None:

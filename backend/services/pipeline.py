@@ -1,6 +1,6 @@
 from services.preprocess import preprocess_image
 from services.ocr import extract_text
-from services.table_detector import detect_table_bbox
+from services.table_detector import detect_table_grid
 
 from agents.ocr_normalizer import normalize
 from agents.layout_agent import segment_layout
@@ -36,16 +36,20 @@ def process_bill(path):
     )
 
     # ----------------------------
-    # TABLE DETECTION (NEW)
+    # TABLE GRID DETECTION
     # ----------------------------
-    table_bbox = detect_table_bbox(image)
+    table_grid = detect_table_grid(image)
 
     for item in normalized:
+        # attach grid so downstream agents can use it
+        item["table_grid"] = table_grid
+
+        # extract word position
         x = item["bbox"][0][0]
         y = item["bbox"][0][1]
 
-        if table_bbox:
-            x1, y1, x2, y2 = table_bbox
+        if table_grid:
+            x1, y1, x2, y2 = table_grid["bbox"]
 
             if x1 <= x <= x2 and y1 <= y <= y2:
                 item["region"] = "TABLE"
@@ -62,8 +66,13 @@ def process_bill(path):
     segmented = segment_layout(normalized)
     semantic = semantic_label(segmented)
 
+    # 🔥 RE-ATTACH GRID AFTER SEMANTIC LABELING
+    for item in semantic:
+        item["table_grid"] = table_grid
+
     header = extract_header(semantic)
     table = build_table(semantic)
+
     marked_total = extract_total(semantic)
     validation = validate(table, marked_total)
 
