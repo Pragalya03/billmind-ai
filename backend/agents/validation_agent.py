@@ -1,27 +1,24 @@
-def validate(table, marked_total):
-    calculated = sum(row["line_total"] for row in table)
+def validate(table, detected_total):
+    # Only include rows that have a computed line_total
+    valid_rows = [row for row in table if row["line_total"] is not None]
 
-    if marked_total is None:
+    calculated = sum(row["line_total"] for row in valid_rows)
+
+    if detected_total is None:
         return {
-            "status": "REVIEW",
-            "message": "Handwritten total not found"
+            "status": "UNKNOWN",
+            "message": "Total not detected in bill"
         }
 
-    diff = abs(calculated - marked_total)
-
-    if diff < 1:
+    if abs(calculated - detected_total) < 1:
         return {
             "status": "MATCH",
-            "message": "Calculated total matches handwritten total"
-        }
-
-    if diff <= 5:
-        return {
-            "status": "PARTIAL_MATCH",
-            "message": "Minor difference detected, possibly tax or rounding"
+            "message": f"Calculated total {calculated} matches detected total"
         }
 
     return {
         "status": "MISMATCH",
-        "message": f"Calculated {calculated}, but handwritten total is {marked_total}"
+        "message": (
+            f"Calculated total {calculated} does not match detected total {detected_total}"
+        )
     }
