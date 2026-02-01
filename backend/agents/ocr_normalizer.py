@@ -1,47 +1,47 @@
-from agents.layout_utils import bbox_center
-import re
+from db import get_ocr_corrections
 
-def clean_text(text):
-    text = text.replace("Rs.", "").replace("/-", "")
-    text = re.sub(r"\s+", "", text)
+
+def clean_text(text: str) -> str:
+    """
+    Basic OCR cleanup.
+    Keep this EVEN if OCR improves.
+    """
+    if not text:
+        return text
+
+    # common handwritten OCR mistakes
+    text = text.replace("O", "0").replace("o", "0")
+    text = text.replace(",", "").strip()
+
     return text
 
-def normalize(ocr_items, y_thresh=15):
-    ocr_items = sorted(ocr_items, key=lambda x: bbox_center(x["bbox"])[1])
 
-    lines = []
-    current = []
-
-    for token in ocr_items:
-        if not current:
-            current.append(token)
-            continue
-
-        _, y1 = bbox_center(current[-1]["bbox"])
-        _, y2 = bbox_center(token["bbox"])
-
-        if abs(y1 - y2) < y_thresh:
-            current.append(token)
-        else:
-            lines.append(current)
-            current = [token]
-
-    if current:
-        lines.append(current)
-
+def normalize(items):
+    """
+    Normalize OCR output + auto-apply learned corrections.
+    """
+    corrections = get_ocr_corrections()
     normalized = []
 
-    for line in lines:
-        line = sorted(line, key=lambda x: bbox_center(x["bbox"])[0])
-        text = " ".join(t["text"] for t in line)
-        text = clean_text(text)
+    for item in items:
+        original_text = item["text"]
 
-        conf = sum(t["confidence"] for t in line) / len(line)
+        # -------------------------
+        # 1️⃣ Base cleanup (existing behavior)
+        # -------------------------
+        cleaned = clean_text(original_text)
+        item["text"] = cleaned
 
-        normalized.append({
-            "text": text,
-            "confidence": conf,
-            "bbox": line[0]["bbox"]
-        })
+        # -------------------------
+        # 2️⃣ Apply learned correction (NEW)
+        # -------------------------
+        if cleaned in corrections:
+            item["text"] = corrections[cleaned]
+            item["confidence"] = 1.0
+            item["auto_corrected"] = True
+        else:
+            item["auto_corrected"] = False
+
+        normalized.append(item)
 
     return normalized
