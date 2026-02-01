@@ -1,6 +1,29 @@
 from agents.product_agent import match_product
 
 
+# ------------------ NEW (SAFE ADDITION) ------------------
+TOTAL_KEYWORDS = {"total", "grand total", "amount", "sum"}
+
+def normalize_alpha(text: str) -> str:
+    """
+    Normalize OCR mistakes for semantic checks
+    """
+    if not text:
+        return ""
+
+    text = text.lower()
+    text = text.replace("0", "o")
+    text = text.replace("1", "l")
+    text = text.replace("|", "l")
+    return text.strip()
+
+
+def is_total_text(text: str) -> bool:
+    normalized = normalize_alpha(text)
+    return any(k in normalized for k in TOTAL_KEYWORDS)
+# --------------------------------------------------------
+
+
 def clean_number(text):
     return text.replace("o", "0").replace("O", "0")
 
@@ -14,7 +37,6 @@ def is_number(text):
 
 
 def inside_center(word_bbox, cell_bbox, tol=5):
-    # use CENTER of OCR bbox with tolerance
     cx = (word_bbox[0][0] + word_bbox[2][0]) / 2
     cy = (word_bbox[0][1] + word_bbox[2][1]) / 2
     x1, y1, x2, y2 = cell_bbox
@@ -40,7 +62,6 @@ def build_table(items, y_threshold=0.08):
         print("Vertical lines:", vlines)
         print("Horizontal lines:", hlines)
 
-        # build cells
         cells = []
         for r in range(len(hlines) - 1):
             for c in range(len(vlines) - 1):
@@ -53,7 +74,6 @@ def build_table(items, y_threshold=0.08):
 
         print("Total cells:", len(cells))
 
-        # assign words to cells
         for word in table_items:
             assigned = False
             for cell in cells:
@@ -66,11 +86,8 @@ def build_table(items, y_threshold=0.08):
                     break
 
             if not assigned:
-                print(
-                    f"❌ WORD '{word['text']}' not assigned to any cell"
-                )
+                print(f"❌ WORD '{word['text']}' not assigned to any cell")
 
-        # assemble rows
         rows = {}
         for cell in cells:
             if cell["words"]:
@@ -102,6 +119,12 @@ def build_table(items, y_threshold=0.08):
 
                 elif col == 3 and is_number(text):
                     data["unit_price"] = float(clean_number(text))
+
+            # ------------------ 🔥 KEY FIX ------------------
+            if data["item"] and is_total_text(data["item"]):
+                print("⛔ Skipping TOTAL row from table:", data["item"])
+                continue
+            # ------------------------------------------------
 
             if data["item"]:
                 if data["quantity"] is not None and data["unit_price"] is not None:
@@ -153,6 +176,12 @@ def _fallback_table(items, y_threshold):
                 name = c["text"]
             elif is_number(c["text"]):
                 nums.append(float(clean_number(c["text"])))
+
+        # ------------------ 🔥 KEY FIX (fallback) ------------------
+        if name and is_total_text(name):
+            print("⛔ Skipping TOTAL row from fallback:", name)
+            continue
+        # ----------------------------------------------------------
 
         qty = price = None
         if len(nums) >= 2:
