@@ -7,6 +7,9 @@ function App() {
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
 
+  // =========================
+  // UPLOAD
+  // =========================
   const upload = async (f) => {
     if (!f) return
     try {
@@ -30,33 +33,56 @@ function App() {
     upload(f)
   }
 
-  const confirmWord = async (original) => {
-    await axios.post("http://localhost:8000/correct", {
-      original,
-      corrected: original
-    })
-    await upload(file)
+  // =========================
+  // LOW CONFIDENCE HANDLING
+  // =========================
+  const removeReviewWord = (text) => {
+    setResult((prev) => ({
+      ...prev,
+      review_items: prev.review_items.filter(
+        (w) => w.text !== text
+      )
+    }))
   }
 
-  const editWord = async (original) => {
-    const corrected = prompt("Correct text:", original)
+  const confirmWord = async (text) => {
+    await axios.post("http://localhost:8000/correct", {
+      bill_id: result.bill_id,
+      original: text,
+      corrected: text,
+      action: "confirm"
+    })
+
+    removeReviewWord(text)
+  }
+
+  const editWord = async (text) => {
+    const corrected = prompt("Correct text:", text)
     if (!corrected) return
 
     await axios.post("http://localhost:8000/correct", {
-      original,
-      corrected
+      bill_id: result.bill_id,
+      original: text,
+      corrected,
+      action: "edit"
     })
-    await upload(file)
+
+    removeReviewWord(text)
   }
 
-  const deleteWord = async (original) => {
+  const deleteWord = async (text) => {
     await axios.post("http://localhost:8000/correct", {
-      original,
+      bill_id: result.bill_id,
+      original: text,
       action: "delete"
     })
-    await upload(file)
+
+    removeReviewWord(text)
   }
 
+  // =========================
+  // TABLE EDITING
+  // =========================
   const updateCell = (rowIndex, field, value) => {
     const updated = structuredClone(result)
     const num = Number(value)
@@ -71,7 +97,9 @@ function App() {
     setResult(updated)
   }
 
-  // FRONTEND FINAL TOTAL (SOURCE OF TRUTH)
+  // =========================
+  // FINAL TOTAL
+  // =========================
   const frontendTotal = useMemo(() => {
     if (!result?.table) return 0
 
@@ -82,7 +110,9 @@ function App() {
     return Number(total.toFixed(2))
   }, [result])
 
-  // ✅ FIXED FINALIZE CALL
+  // =========================
+  // FINALIZE BILL
+  // =========================
   const finalizeBill = async () => {
     if (!result) return
 
@@ -90,10 +120,10 @@ function App() {
       setSaving(true)
 
       await axios.post("http://localhost:8000/finalize-bill", {
-        bill_id: result.bill_id,              // ✅ REQUIRED
+        bill_id: result.bill_id,
         table: result.table,
         final_total: frontendTotal,
-        confidence: result.final_confidence   // ✅ RENAMED
+        confidence: result.final_confidence
       })
 
       alert("✅ Bill saved successfully")
@@ -105,6 +135,9 @@ function App() {
     }
   }
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h2>📄 BillMind AI</h2>
@@ -114,6 +147,39 @@ function App() {
 
       {result && (
         <>
+          {/* LOW CONFIDENCE WORDS */}
+          {result.review_items?.length > 0 && (
+            <>
+              <h3>🧐 Confirm Low-Confidence Words</h3>
+
+              {result.review_items.map((r, i) => (
+                <div
+                  key={i}
+                  style={{
+                    marginBottom: 8,
+                    padding: 6,
+                    border: "1px solid #f5c2c7",
+                    background: "#fff5f5"
+                  }}
+                >
+                  <span style={{ color: "red", fontWeight: "bold" }}>
+                    {r.text} ({r.confidence.toFixed(2)})
+                  </span>
+
+                  <button onClick={() => confirmWord(r.text)}>
+                    Confirm
+                  </button>
+                  <button onClick={() => editWord(r.text)}>
+                    Edit
+                  </button>
+                  <button onClick={() => deleteWord(r.text)}>
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+
           {/* STORE */}
           <h3>🏪 Store</h3>
           <p><b>Name:</b> {result.header?.shop_name || "Not detected"}</p>
@@ -145,7 +211,7 @@ function App() {
                   >
                     <td>{row.item}</td>
                     <td>
-                      {row.quantity != null ? row.quantity : (
+                      {row.quantity ?? (
                         <input
                           type="number"
                           onBlur={(e) =>
@@ -155,7 +221,7 @@ function App() {
                       )}
                     </td>
                     <td>
-                      {row.unit_price != null ? row.unit_price : (
+                      {row.unit_price ?? (
                         <input
                           type="number"
                           onBlur={(e) =>
@@ -172,13 +238,11 @@ function App() {
             </tbody>
           </table>
 
-          {/* FINAL TOTAL */}
           <h3>💰 Final Bill Total</h3>
           <p style={{ fontSize: 18, fontWeight: "bold" }}>
             ₹ {frontendTotal}
           </p>
 
-          {/* FINALIZE */}
           <button
             onClick={finalizeBill}
             disabled={saving}

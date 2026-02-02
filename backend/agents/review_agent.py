@@ -1,16 +1,15 @@
 def collect_review_items(ocr_items, threshold=0.6):
+    """
+    Collect low-confidence OCR words for user review.
+    PURE function — no DB, no bill_id.
+    """
     review = []
 
     for i in ocr_items:
-        # 🔥 skip words auto-corrected from learning DB
-        if i.get("auto_corrected"):
-            continue
-
-        # normal low-confidence review
         if i.get("confidence", 1.0) < threshold:
             review.append({
                 "text": i["text"],
-                "confidence": i["confidence"]
+                "confidence": round(i["confidence"], 2)
             })
 
     return review
