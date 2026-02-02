@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 import os
 import uuid
+from db import finalize_bill_summary
 
 from services.pipeline import process_bill
 from db import (
@@ -86,11 +87,8 @@ def finalize_bill(payload: FinalizePayload):
     insert_bill_items(bill_id, payload.table)
 
     # 3️⃣ Update final bill summary (FULL ARGUMENTS)
-    update_bill_summary(
+    finalize_bill_summary(
         bill_id=bill_id,
-        shop_name=None,          # already stored during upload
-        shop_address=None,       # already stored during upload
-        detected_total=None,     # OCR total already stored
         final_total=payload.final_total,
         confidence=payload.confidence
     )
