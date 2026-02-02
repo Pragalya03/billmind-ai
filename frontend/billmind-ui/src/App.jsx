@@ -5,6 +5,7 @@ function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [file, setFile] = useState(null)
+  const [saving, setSaving] = useState(false) // 🔥 NEW
 
   const upload = async (f) => {
     if (!f) return
@@ -78,9 +79,30 @@ function App() {
       .filter((r) => r.line_total != null)
       .reduce((sum, r) => sum + r.line_total, 0)
 
-    console.log("🧮 FRONTEND CALCULATED TOTAL:", total)
-    return total.toFixed(2)
+    return Number(total.toFixed(2))
   }, [result])
+
+  // 🔥 NEW: FINALIZE & SAVE BILL
+  const finalizeBill = async () => {
+    if (!result) return
+
+    try {
+      setSaving(true)
+
+      await axios.post("http://localhost:8000/finalize-bill", {
+        table: result.table,
+        final_total: frontendTotal,
+        final_confidence: result.final_confidence
+      })
+
+      alert("✅ Bill saved successfully")
+    } catch (err) {
+      alert("❌ Failed to save bill")
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
@@ -100,7 +122,6 @@ function App() {
                   <span style={{ color: "red" }}>
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
-
                   <button onClick={() => confirmWord(r.text)}>Confirm</button>
                   <button onClick={() => editWord(r.text)}>Edit</button>
                   <button onClick={() => deleteWord(r.text)}>Delete</button>
@@ -171,7 +192,7 @@ function App() {
             </tbody>
           </table>
 
-          {/* FINAL TOTAL (FRONTEND SOURCE OF TRUTH) */}
+          {/* FINAL TOTAL */}
           <h3>💰 Final Bill Total</h3>
           <p style={{ fontSize: 18, fontWeight: "bold" }}>
             ₹ {frontendTotal}
@@ -183,7 +204,6 @@ function App() {
             {result.marked_total ?? "Not detected"}
           </p>
 
-          {/* VALIDATION MESSAGE (FRONTEND-AWARE) */}
           {result.marked_total != null && (
             <p
               style={{
@@ -200,12 +220,25 @@ function App() {
             </p>
           )}
 
-
           {/* CONFIDENCE */}
           <h3>📊 Final Bill Confidence</h3>
           <p style={{ fontWeight: "bold" }}>
             {result.final_confidence}
           </p>
+
+          {/* 🔥 FINALIZE BUTTON */}
+          <button
+            onClick={finalizeBill}
+            disabled={saving}
+            style={{
+              marginTop: 20,
+              padding: "10px 20px",
+              fontSize: 16,
+              cursor: "pointer"
+            }}
+          >
+            {saving ? "Saving..." : "✅ Finalize & Save Bill"}
+          </button>
         </>
       )}
     </div>
