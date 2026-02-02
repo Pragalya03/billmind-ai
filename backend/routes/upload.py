@@ -1,13 +1,34 @@
 from fastapi import APIRouter, UploadFile, File
+from pydantic import BaseModel
 import os
 import uuid
+
 from services.pipeline import process_bill
-from db import insert_bill, insert_bill_items, update_bill_summary
+from db import (
+    insert_bill,
+    insert_bill_items,
+    update_bill_summary,
+    delete_bill_items
+)
 
 router = APIRouter()
 
 UPLOAD_DIR = "uploads/bills"
 
+
+# ===============================
+# MODELS
+# ===============================
+class FinalizePayload(BaseModel):
+    bill_id: int
+    table: list
+    final_total: float
+    confidence: float
+
+
+# ===============================
+# UPLOAD (DRAFT OCR)
+# ===============================
 @router.post("/upload")
 async def upload_bill(file: UploadFile = File(...)):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -19,16 +40,16 @@ async def upload_bill(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
-    # 1️⃣ Insert bill
+    # 1️⃣ Insert bill shell
     bill_id = insert_bill(file_path)
 
-    # 2️⃣ Run pipeline
+    # 2️⃣ Run OCR + pipeline
     result = process_bill(file_path)
 
-    # 3️⃣ Insert bill items
+    # 3️⃣ Insert INITIAL items (draft)
     insert_bill_items(bill_id, result["table"])
 
-    # calculate final total from line items
+    # 4️⃣ Initial totals (OCR only)
     final_total = sum(
         item["line_total"] for item in result["table"]
         if item.get("line_total") is not None
@@ -48,3 +69,33 @@ async def upload_bill(file: UploadFile = File(...)):
         **result
     }
 
+
+# ===============================
+# FINALIZE (USER-CONFIRMED TRUTH)
+# ===============================
+@router.post("/finalize-bill")
+def finalize_bill(payload: FinalizePayload):
+    bill_id = payload.bill_id
+
+    print("🟢 FINALIZING BILL:", bill_id)
+
+    # 1️⃣ Remove old OCR items
+    delete_bill_items(bill_id)
+
+    # 2️⃣ Insert corrected items
+    insert_bill_items(bill_id, payload.table)
+
+    # 3️⃣ Update final bill summary (FULL ARGUMENTS)
+    update_bill_summary(
+        bill_id=bill_id,
+        shop_name=None,          # already stored during upload
+        shop_address=None,       # already stored during upload
+        detected_total=None,     # OCR total already stored
+        final_total=payload.final_total,
+        confidence=payload.confidence
+    )
+
+    return {
+        "status": "finalized",
+        "bill_id": bill_id
+    }

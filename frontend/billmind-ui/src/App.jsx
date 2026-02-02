@@ -5,7 +5,7 @@ function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [file, setFile] = useState(null)
-  const [saving, setSaving] = useState(false) // 🔥 NEW
+  const [saving, setSaving] = useState(false)
 
   const upload = async (f) => {
     if (!f) return
@@ -71,7 +71,7 @@ function App() {
     setResult(updated)
   }
 
-  // 🔥 FRONTEND FINAL TOTAL (SOURCE OF TRUTH)
+  // FRONTEND FINAL TOTAL (SOURCE OF TRUTH)
   const frontendTotal = useMemo(() => {
     if (!result?.table) return 0
 
@@ -82,7 +82,7 @@ function App() {
     return Number(total.toFixed(2))
   }, [result])
 
-  // 🔥 NEW: FINALIZE & SAVE BILL
+  // ✅ FIXED FINALIZE CALL
   const finalizeBill = async () => {
     if (!result) return
 
@@ -90,9 +90,10 @@ function App() {
       setSaving(true)
 
       await axios.post("http://localhost:8000/finalize-bill", {
+        bill_id: result.bill_id,              // ✅ REQUIRED
         table: result.table,
         final_total: frontendTotal,
-        final_confidence: result.final_confidence
+        confidence: result.final_confidence   // ✅ RENAMED
       })
 
       alert("✅ Bill saved successfully")
@@ -113,23 +114,6 @@ function App() {
 
       {result && (
         <>
-          {/* LOW CONFIDENCE WORDS */}
-          {result.review_items?.length > 0 && (
-            <>
-              <h3>🧐 Confirm Low-Confidence Words</h3>
-              {result.review_items.map((r, i) => (
-                <div key={i} style={{ marginBottom: 6 }}>
-                  <span style={{ color: "red" }}>
-                    {r.text} ({r.confidence.toFixed(2)})
-                  </span>
-                  <button onClick={() => confirmWord(r.text)}>Confirm</button>
-                  <button onClick={() => editWord(r.text)}>Edit</button>
-                  <button onClick={() => deleteWord(r.text)}>Delete</button>
-                </div>
-              ))}
-            </>
-          )}
-
           {/* STORE */}
           <h3>🏪 Store</h3>
           <p><b>Name:</b> {result.header?.shop_name || "Not detected"}</p>
@@ -161,9 +145,7 @@ function App() {
                   >
                     <td>{row.item}</td>
                     <td>
-                      {row.quantity != null ? (
-                        row.quantity
-                      ) : (
+                      {row.quantity != null ? row.quantity : (
                         <input
                           type="number"
                           onBlur={(e) =>
@@ -173,9 +155,7 @@ function App() {
                       )}
                     </td>
                     <td>
-                      {row.unit_price != null ? (
-                        row.unit_price
-                      ) : (
+                      {row.unit_price != null ? row.unit_price : (
                         <input
                           type="number"
                           onBlur={(e) =>
@@ -198,44 +178,11 @@ function App() {
             ₹ {frontendTotal}
           </p>
 
-          {/* OCR CHECK */}
-          <p>
-            <b>Detected (OCR) Total:</b>{" "}
-            {result.marked_total ?? "Not detected"}
-          </p>
-
-          {result.marked_total != null && (
-            <p
-              style={{
-                fontWeight: "bold",
-                color:
-                  Math.abs(frontendTotal - result.marked_total) < 1
-                    ? "green"
-                    : "red"
-              }}
-            >
-              {Math.abs(frontendTotal - result.marked_total) < 1
-                ? `Final total ${frontendTotal} matches the detected handwritten total ${result.marked_total}.`
-                : `Final total ${frontendTotal} does NOT match the detected handwritten total ${result.marked_total}.`}
-            </p>
-          )}
-
-          {/* CONFIDENCE */}
-          <h3>📊 Final Bill Confidence</h3>
-          <p style={{ fontWeight: "bold" }}>
-            {result.final_confidence}
-          </p>
-
-          {/* 🔥 FINALIZE BUTTON */}
+          {/* FINALIZE */}
           <button
             onClick={finalizeBill}
             disabled={saving}
-            style={{
-              marginTop: 20,
-              padding: "10px 20px",
-              fontSize: 16,
-              cursor: "pointer"
-            }}
+            style={{ marginTop: 20, padding: "10px 20px", fontSize: 16 }}
           >
             {saving ? "Saving..." : "✅ Finalize & Save Bill"}
           </button>

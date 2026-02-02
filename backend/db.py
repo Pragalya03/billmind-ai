@@ -14,6 +14,7 @@ def get_db_connection():
         print("❌ Database connection error:", e)
         return None
     
+
 def insert_bill(image_path):
     conn = get_db_connection()
     if not conn:
@@ -35,6 +36,7 @@ def insert_bill(image_path):
     conn.close()
 
     return bill_id
+
 
 def insert_bill_items(bill_id, items):
     conn = get_db_connection()
@@ -68,6 +70,28 @@ def insert_bill_items(bill_id, items):
 
     return True
 
+
+# ✅✅✅ ADD THIS FUNCTION (NEW) ✅✅✅
+def delete_bill_items(bill_id):
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM bill_items WHERE bill_id = %s",
+        (bill_id,)
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return True
+# ✅✅✅ END ADDITION ✅✅✅
+
+
 def save_ocr_correction(original, corrected):
     conn = get_db_connection()
     if not conn:
@@ -75,7 +99,6 @@ def save_ocr_correction(original, corrected):
 
     cursor = conn.cursor()
 
-    # check if correction already exists
     cursor.execute(
         "SELECT id, frequency FROM ocr_corrections WHERE original_text=%s AND corrected_text=%s",
         (original, corrected)
@@ -98,6 +121,7 @@ def save_ocr_correction(original, corrected):
     cursor.close()
     conn.close()
 
+
 def get_ocr_corrections():
     conn = get_db_connection()
     if not conn:
@@ -114,8 +138,8 @@ def get_ocr_corrections():
     cursor.close()
     conn.close()
 
-    # map: original -> corrected
     return {r["original_text"]: r["corrected_text"] for r in rows}
+
 
 def update_bill_summary(
     bill_id,
