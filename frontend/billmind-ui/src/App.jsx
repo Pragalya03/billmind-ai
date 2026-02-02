@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import axios from "axios"
+import OcrReview from "./pages/OcrReview"
 
 function App() {
   const [result, setResult] = useState(null)
@@ -7,9 +8,8 @@ function App() {
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  // =========================
-  // UPLOAD
-  // =========================
+  const [stage, setStage] = useState("review") // review | bill
+
   const upload = async (f) => {
     if (!f) return
     try {
@@ -19,6 +19,7 @@ function App() {
 
       const res = await axios.post("http://localhost:8000/upload", form)
       setResult(res.data)
+      setStage("review")
     } catch (e) {
       alert("Upload failed")
       console.error(e)
@@ -33,103 +34,6 @@ function App() {
     upload(f)
   }
 
-  // =========================
-  // 🔥 CONTEXTUAL REINJECTION
-  // =========================
-  const applyCorrection = (response) => {
-    if (!response || response.status !== "updated") return
-
-    setResult((prev) => {
-      if (!prev) return prev
-
-      const updated = structuredClone(prev)
-      const { original, corrected, label } = response
-
-      // HEADER / ADDRESS → STORE
-      if (label === "HEADER" || label === "ADDRESS") {
-        if (!updated.header) updated.header = {}
-
-        if (!updated.header.shop_name) {
-          updated.header.shop_name = corrected
-        } else {
-          updated.header.address = updated.header.address
-            ? updated.header.address + " " + corrected
-            : corrected
-        }
-      }
-
-      // ITEM → TABLE
-      if (label === "ITEM") {
-        updated.table = updated.table.map((row) => {
-          if (row.item && row.item.includes(original)) {
-            return {
-              ...row,
-              item: row.item.replace(original, corrected)
-            }
-          }
-          return row
-        })
-      }
-
-      // REMOVE FROM LOW CONFIDENCE LIST
-      updated.review_items = updated.review_items.filter(
-        (w) => w.text !== original
-      )
-
-      return updated
-    })
-  }
-
-  // =========================
-  // LOW CONFIDENCE ACTIONS
-  // =========================
-  const confirmWord = async (text, meta) => {
-    const res = await axios.post("http://localhost:8000/correct", {
-      bill_id: result.bill_id,
-      original: text,
-      corrected: text,
-      action: "confirm",
-      label: meta.label,
-      bbox: meta.bbox,
-      y_norm: meta.y_norm
-    })
-
-    applyCorrection(res.data)
-  }
-
-  const editWord = async (text, meta) => {
-    const corrected = prompt("Correct text:", text)
-    if (!corrected) return
-
-    const res = await axios.post("http://localhost:8000/correct", {
-      bill_id: result.bill_id,
-      original: text,
-      corrected,
-      action: "edit",
-      label: meta.label,
-      bbox: meta.bbox,
-      y_norm: meta.y_norm
-    })
-
-    applyCorrection(res.data)
-  }
-
-  const deleteWord = async (text) => {
-    await axios.post("http://localhost:8000/correct", {
-      bill_id: result.bill_id,
-      original: text,
-      action: "delete"
-    })
-
-    setResult((prev) => ({
-      ...prev,
-      review_items: prev.review_items.filter((w) => w.text !== text)
-    }))
-  }
-
-  // =========================
-  // TABLE EDITING
-  // =========================
   const updateCell = (rowIndex, field, value) => {
     const updated = structuredClone(result)
     const num = Number(value)
@@ -144,35 +48,27 @@ function App() {
     setResult(updated)
   }
 
-  // =========================
-  // FINAL TOTAL
-  // =========================
   const frontendTotal = useMemo(() => {
     if (!result?.table) return 0
-
-    const total = result.table
-      .filter((r) => r.line_total != null)
-      .reduce((sum, r) => sum + r.line_total, 0)
-
-    return Number(total.toFixed(2))
+    return Number(
+      result.table
+        .filter((r) => r.line_total != null)
+        .reduce((s, r) => s + r.line_total, 0)
+        .toFixed(2)
+    )
   }, [result])
 
-  // =========================
-  // FINALIZE BILL
-  // =========================
   const finalizeBill = async () => {
     if (!result) return
 
     try {
       setSaving(true)
-
       await axios.post("http://localhost:8000/finalize-bill", {
         bill_id: result.bill_id,
         table: result.table,
         final_total: frontendTotal,
         confidence: result.final_confidence
       })
-
       alert("✅ Bill saved successfully")
     } catch (err) {
       alert("❌ Failed to save bill")
@@ -182,9 +78,6 @@ function App() {
     }
   }
 
-  // =========================
-  // UI
-  // =========================
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h2>📄 BillMind AI</h2>
@@ -192,47 +85,19 @@ function App() {
       <input type="file" onChange={handleFile} />
       {loading && <p>⏳ Processing...</p>}
 
-      {result && (
+      {result && stage === "review" && (
+        <OcrReview
+          result={result}
+          onContinue={() => setStage("bill")}
+        />
+      )}
+
+      {result && stage === "bill" && (
         <>
-          {/* LOW CONFIDENCE WORDS */}
-          {result.review_items?.length > 0 && (
-            <>
-              <h3>🧐 Confirm Low-Confidence Words</h3>
-
-              {result.review_items.map((r, i) => (
-                <div
-                  key={i}
-                  style={{
-                    marginBottom: 8,
-                    padding: 6,
-                    border: "1px solid #f5c2c7",
-                    background: "#fff5f5"
-                  }}
-                >
-                  <span style={{ color: "red", fontWeight: "bold" }}>
-                    {r.text} ({r.confidence.toFixed(2)})
-                  </span>
-
-                  <button onClick={() => confirmWord(r.text, r)}>
-                    Confirm
-                  </button>
-                  <button onClick={() => editWord(r.text, r)}>
-                    Edit
-                  </button>
-                  <button onClick={() => deleteWord(r.text)}>
-                    Delete
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
-
-          {/* STORE */}
           <h3>🏪 Store</h3>
           <p><b>Name:</b> {result.header?.shop_name || "Not detected"}</p>
           <p><b>Address:</b> {result.header?.address || "Not detected"}</p>
 
-          {/* TABLE */}
           <h3>🧾 Items</h3>
           <table border="1" cellPadding="8" width="100%">
             <thead>

@@ -1,6 +1,6 @@
-import numpy as np
 from services.preprocess import preprocess_image
 from services.ocr import extract_text
+
 from agents.ocr_normalizer import normalize
 from agents.layout_agent import segment_layout
 from agents.semantic_agent import semantic_label
@@ -10,54 +10,39 @@ from agents.footer_agent import extract_total
 from agents.validation_agent import validate
 from agents.review_agent import collect_review_items
 
-def to_python(obj):
-    """
-    Recursively convert numpy types to native Python types
-    so FastAPI can JSON-serialize safely.
-    """
-    if isinstance(obj, dict):
-        return {k: to_python(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [to_python(v) for v in obj]
-    elif isinstance(obj, np.generic):
-        return obj.item()
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    else:
-        return obj
 
+def process_bill(path, mode="draft"):
+    """
+    mode = "draft"  → show low-confidence words
+    mode = "final"  → apply learned corrections, no review list
+    """
 
-def process_bill(path):
     # ----------------------------
     # Image + OCR
     # ----------------------------
     image, _ = preprocess_image(path)
-
     raw_ocr = extract_text(image)
 
-    # ----------------------------
-    # 🔥 LOW-CONFIDENCE WORDS (FROM RAW OCR ONLY)
-    # ----------------------------
-    review_items = collect_review_items(
-    raw_ocr  # ← THIS IS THE KEY
-)
+    normalized = normalize(raw_ocr)
 
     # ----------------------------
-    # NORMALIZATION (STRUCTURE ONLY)
+    # LOW-CONFIDENCE WORDS
     # ----------------------------
-    normalized = normalize(raw_ocr)
+    review_items = []
+    if mode == "draft":
+        review_items = collect_review_items(normalized)
 
     # ----------------------------
     # FINAL BILL CONFIDENCE
     # ----------------------------
-    confidences = [i["confidence"] for i in raw_ocr]
+    confidences = [i["confidence"] for i in normalized]
     final_confidence = (
         round(sum(confidences) / len(confidences), 2)
         if confidences else 0.0
     )
 
     # ----------------------------
-    # EXISTING PIPELINE
+    # PIPELINE
     # ----------------------------
     segmented = segment_layout(normalized)
     semantic = semantic_label(segmented)
@@ -67,7 +52,7 @@ def process_bill(path):
     marked_total = extract_total(semantic)
     validation = validate(table, marked_total)
 
-    response = {
+    return {
         "header": header,
         "table": table,
         "marked_total": marked_total,
@@ -75,6 +60,3 @@ def process_bill(path):
         "final_confidence": final_confidence,
         "review_items": review_items
     }
-
-    return to_python(response)
-

@@ -2,7 +2,7 @@ def collect_review_items(ocr_items, threshold=0.6):
     """
     Collect low-confidence OCR words for user review.
     CONTEXT-AWARE version (required for reinjection).
-    Still PURE — no DB, no bill_id.
+    PURE function — no DB, no bill_id.
     """
     review = []
 
@@ -14,10 +14,10 @@ def collect_review_items(ocr_items, threshold=0.6):
                 "text": i.get("text"),
                 "confidence": round(confidence, 2),
 
-                # 🔥 CONTEXT FOR REINJECTION
-                "label": i.get("label"),        # ADDRESS / HEADER / ITEM / etc.
-                "bbox": i.get("bbox"),          # original position
-                "y_norm": i.get("y_norm")       # line alignment
+                # context for reinjection
+                "label": i.get("label"),
+                "bbox": i.get("bbox"),
+                "y_norm": i.get("y_norm")
             })
 
     return review
