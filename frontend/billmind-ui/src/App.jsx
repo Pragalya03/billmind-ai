@@ -37,12 +37,16 @@ function App() {
   // LOW CONFIDENCE HANDLING
   // =========================
   const removeReviewWord = (text) => {
-    setResult((prev) => ({
-      ...prev,
-      review_items: prev.review_items.filter(
-        (w) => w.text !== text
-      )
-    }))
+    setResult((prev) => {
+      if (!prev?.review_items) return prev
+
+      return {
+        ...prev,
+        review_items: prev.review_items.filter(
+          (w) => w.text !== text
+        )
+      }
+    })
   }
 
   const confirmWord = async (text) => {
@@ -166,15 +170,9 @@ function App() {
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
 
-                  <button onClick={() => confirmWord(r.text)}>
-                    Confirm
-                  </button>
-                  <button onClick={() => editWord(r.text)}>
-                    Edit
-                  </button>
-                  <button onClick={() => deleteWord(r.text)}>
-                    Delete
-                  </button>
+                  <button onClick={() => confirmWord(r.text)}>Confirm</button>
+                  <button onClick={() => editWord(r.text)}>Edit</button>
+                  <button onClick={() => deleteWord(r.text)}>Delete</button>
                 </div>
               ))}
             </>

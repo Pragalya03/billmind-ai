@@ -59,7 +59,7 @@ def build_table(semantic_items, y_threshold=0.08):
                 f"  {cell['text']} | x={cell['bbox'][0][0]:.1f} | y={float(cell['y_norm']):.2f}"
             )
 
-    # -------- BUILD TABLE (NUMERIC PRIORITY LOGIC) --------
+    # -------- BUILD TABLE (CONTEXTUAL REINJECTION FIX) --------
     table = []
 
     for row_idx, row in enumerate(rows):
@@ -67,25 +67,26 @@ def build_table(semantic_items, y_threshold=0.08):
 
         row = sorted(row, key=lambda x: x["bbox"][0][0])
 
-        item_text = None
+        item_words = []
         numbers = []
 
         for cell in row:
             text = cell["text"]
 
-            # 🔥 FIX: never treat TOTAL-like text as item
+            # 🔥 Never allow TOTAL-like text into items
             if is_total_text(text):
                 print(f"⛔ Skipping TOTAL word: {text}")
                 continue
 
-            if not is_number(text) and item_text is None:
-                item_text = text
-                print(f"ITEM detected: {text}")
-
-            elif is_number(text):
+            if is_number(text):
                 value = float(clean_number(text))
                 numbers.append(value)
                 print(f"NUMBER detected: {value}")
+            else:
+                item_words.append(text)
+                print(f"ITEM WORD collected: {text}")
+
+        item_text = " ".join(item_words).strip() if item_words else None
 
         qty = None
         price = None

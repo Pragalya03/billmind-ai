@@ -1,3 +1,4 @@
+import numpy as np
 from services.preprocess import preprocess_image
 from services.ocr import extract_text
 from agents.ocr_normalizer import normalize
@@ -8,6 +9,22 @@ from agents.table_agent import build_table
 from agents.footer_agent import extract_total
 from agents.validation_agent import validate
 from agents.review_agent import collect_review_items
+
+def to_python(obj):
+    """
+    Recursively convert numpy types to native Python types
+    so FastAPI can JSON-serialize safely.
+    """
+    if isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
 
 
 def process_bill(path):
@@ -50,7 +67,7 @@ def process_bill(path):
     marked_total = extract_total(semantic)
     validation = validate(table, marked_total)
 
-    return {
+    response = {
         "header": header,
         "table": table,
         "marked_total": marked_total,
@@ -58,3 +75,6 @@ def process_bill(path):
         "final_confidence": final_confidence,
         "review_items": review_items
     }
+
+    return to_python(response)
+
