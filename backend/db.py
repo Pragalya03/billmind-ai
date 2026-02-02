@@ -195,3 +195,25 @@ def get_ocr_corrections():
     conn.close()
 
     return {r["original_text"]: r["corrected_text"] for r in rows}
+
+def get_bill_path(bill_id: int):
+    """
+    Fetch original bill image path from DB.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT image_path FROM bills WHERE bill_id = %s",
+        (bill_id,)
+    )
+
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if not row:
+        return None
+
+    return row["image_path"]

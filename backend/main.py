@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from routes.upload import router as upload_router
 from routes.corrections import router as correction_router
 from routes.save import router as save_router
+from routes.reprocess import router as reprocess_router
 
 app = FastAPI()
 
@@ -25,3 +26,4 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(upload_router)
 app.include_router(correction_router)
 app.include_router(save_router)
+app.include_router(reprocess_router)
