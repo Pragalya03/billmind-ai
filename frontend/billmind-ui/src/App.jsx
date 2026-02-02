@@ -34,44 +34,84 @@ function App() {
   }
 
   // =========================
-  // LOW CONFIDENCE HANDLING
+  // 🔥 CONTEXTUAL REINJECTION
   // =========================
-  const removeReviewWord = (text) => {
-    setResult((prev) => {
-      if (!prev?.review_items) return prev
+  const applyCorrection = (response) => {
+    if (!response || response.status !== "updated") return
 
-      return {
-        ...prev,
-        review_items: prev.review_items.filter(
-          (w) => w.text !== text
-        )
+    setResult((prev) => {
+      if (!prev) return prev
+
+      const updated = structuredClone(prev)
+      const { original, corrected, label } = response
+
+      // HEADER / ADDRESS → STORE
+      if (label === "HEADER" || label === "ADDRESS") {
+        if (!updated.header) updated.header = {}
+
+        if (!updated.header.shop_name) {
+          updated.header.shop_name = corrected
+        } else {
+          updated.header.address = updated.header.address
+            ? updated.header.address + " " + corrected
+            : corrected
+        }
       }
+
+      // ITEM → TABLE
+      if (label === "ITEM") {
+        updated.table = updated.table.map((row) => {
+          if (row.item && row.item.includes(original)) {
+            return {
+              ...row,
+              item: row.item.replace(original, corrected)
+            }
+          }
+          return row
+        })
+      }
+
+      // REMOVE FROM LOW CONFIDENCE LIST
+      updated.review_items = updated.review_items.filter(
+        (w) => w.text !== original
+      )
+
+      return updated
     })
   }
 
-  const confirmWord = async (text) => {
-    await axios.post("http://localhost:8000/correct", {
+  // =========================
+  // LOW CONFIDENCE ACTIONS
+  // =========================
+  const confirmWord = async (text, meta) => {
+    const res = await axios.post("http://localhost:8000/correct", {
       bill_id: result.bill_id,
       original: text,
       corrected: text,
-      action: "confirm"
+      action: "confirm",
+      label: meta.label,
+      bbox: meta.bbox,
+      y_norm: meta.y_norm
     })
 
-    removeReviewWord(text)
+    applyCorrection(res.data)
   }
 
-  const editWord = async (text) => {
+  const editWord = async (text, meta) => {
     const corrected = prompt("Correct text:", text)
     if (!corrected) return
 
-    await axios.post("http://localhost:8000/correct", {
+    const res = await axios.post("http://localhost:8000/correct", {
       bill_id: result.bill_id,
       original: text,
       corrected,
-      action: "edit"
+      action: "edit",
+      label: meta.label,
+      bbox: meta.bbox,
+      y_norm: meta.y_norm
     })
 
-    removeReviewWord(text)
+    applyCorrection(res.data)
   }
 
   const deleteWord = async (text) => {
@@ -81,7 +121,10 @@ function App() {
       action: "delete"
     })
 
-    removeReviewWord(text)
+    setResult((prev) => ({
+      ...prev,
+      review_items: prev.review_items.filter((w) => w.text !== text)
+    }))
   }
 
   // =========================
@@ -170,9 +213,15 @@ function App() {
                     {r.text} ({r.confidence.toFixed(2)})
                   </span>
 
-                  <button onClick={() => confirmWord(r.text)}>Confirm</button>
-                  <button onClick={() => editWord(r.text)}>Edit</button>
-                  <button onClick={() => deleteWord(r.text)}>Delete</button>
+                  <button onClick={() => confirmWord(r.text, r)}>
+                    Confirm
+                  </button>
+                  <button onClick={() => editWord(r.text, r)}>
+                    Edit
+                  </button>
+                  <button onClick={() => deleteWord(r.text)}>
+                    Delete
+                  </button>
                 </div>
               ))}
             </>
