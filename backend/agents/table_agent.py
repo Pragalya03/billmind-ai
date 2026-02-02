@@ -1,16 +1,12 @@
 from agents.product_agent import match_product
 
 
-# ------------------ NEW (SAFE ADDITION) ------------------
 TOTAL_KEYWORDS = {"total", "grand total", "amount", "sum"}
 
+
 def normalize_alpha(text: str) -> str:
-    """
-    Normalize OCR mistakes for semantic checks
-    """
     if not text:
         return ""
-
     text = text.lower()
     text = text.replace("0", "o")
     text = text.replace("1", "l")
@@ -21,7 +17,6 @@ def normalize_alpha(text: str) -> str:
 def is_total_text(text: str) -> bool:
     normalized = normalize_alpha(text)
     return any(k in normalized for k in TOTAL_KEYWORDS)
-# --------------------------------------------------------
 
 
 def clean_number(text):
@@ -48,13 +43,12 @@ def inside_center(word_bbox, cell_bbox, tol=5):
 
 
 def build_table(items, y_threshold=0.08):
-    table_items = [i for i in items if i.get("region") == "TABLE"]
     grid = next((i.get("table_grid") for i in items if i.get("table_grid")), None)
 
     print("\n--- TABLE AGENT DEBUG ---")
     print("Grid detected:", bool(grid))
 
-    # ---------------- GRID-BASED PARSING ----------------
+    # 🚨 KEY FIX: do NOT filter by region when grid exists
     if grid:
         vlines = grid["vertical_lines"]
         hlines = grid["horizontal_lines"]
@@ -62,6 +56,7 @@ def build_table(items, y_threshold=0.08):
         print("Vertical lines:", vlines)
         print("Horizontal lines:", hlines)
 
+        # build cells
         cells = []
         for r in range(len(hlines) - 1):
             for c in range(len(vlines) - 1):
@@ -74,7 +69,8 @@ def build_table(items, y_threshold=0.08):
 
         print("Total cells:", len(cells))
 
-        for word in table_items:
+        # ✅ USE ALL OCR ITEMS, NOT JUST region == TABLE
+        for word in items:
             assigned = False
             for cell in cells:
                 if inside_center(word["bbox"], cell["bbox"]):
@@ -86,7 +82,7 @@ def build_table(items, y_threshold=0.08):
                     break
 
             if not assigned:
-                print(f"❌ WORD '{word['text']}' not assigned to any cell")
+                pass  # intentionally silent
 
         rows = {}
         for cell in cells:
@@ -120,17 +116,20 @@ def build_table(items, y_threshold=0.08):
                 elif col == 3 and is_number(text):
                     data["unit_price"] = float(clean_number(text))
 
-            # ------------------ 🔥 KEY FIX ------------------
+            # skip TOTAL rows
             if data["item"] and is_total_text(data["item"]):
-                print("⛔ Skipping TOTAL row from table:", data["item"])
+                print("⛔ Skipping TOTAL row:", data["item"])
                 continue
-            # ------------------------------------------------
 
+            # ✅ ALWAYS append item rows
             if data["item"]:
                 if data["quantity"] is not None and data["unit_price"] is not None:
                     data["line_total"] = round(
                         data["quantity"] * data["unit_price"], 2
                     )
+                else:
+                    data["line_total"] = None
+
                 table.append(data)
 
             print("Parsed row:", data)
@@ -140,14 +139,11 @@ def build_table(items, y_threshold=0.08):
 
         return table
 
-    # ---------------- FALLBACK PARSING ----------------
+    # ---------------- FALLBACK ----------------
     print("⚠️ No grid → using fallback parsing")
     return _fallback_table(items, y_threshold)
 
 
-# =====================================================
-# FALLBACK TABLE LOGIC (HEURISTIC)
-# =====================================================
 def _fallback_table(items, y_threshold):
     body = [
         i for i in items
@@ -177,11 +173,8 @@ def _fallback_table(items, y_threshold):
             elif is_number(c["text"]):
                 nums.append(float(clean_number(c["text"])))
 
-        # ------------------ 🔥 KEY FIX (fallback) ------------------
         if name and is_total_text(name):
-            print("⛔ Skipping TOTAL row from fallback:", name)
             continue
-        # ----------------------------------------------------------
 
         qty = price = None
         if len(nums) >= 2:
