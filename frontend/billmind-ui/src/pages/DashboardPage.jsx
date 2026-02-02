@@ -3,17 +3,17 @@ import axios from "axios"
 import { useAuth } from "../auth/AuthContext"
 
 function DashboardPage({ onUpload, onOpenBill }) {
-  const { user, isCustomer, isVendor } = useAuth()
-  const [allBills, setAllBills] = useState([])
+  const { user } = useAuth()
+  const [bills, setBills] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadBills = async () => {
       try {
         const res = await axios.get("http://localhost:8000/bills")
-        setAllBills(res.data || [])
+        setBills(res.data || [])
       } catch {
-        setAllBills([])
+        setBills([])
       } finally {
         setLoading(false)
       }
@@ -22,28 +22,54 @@ function DashboardPage({ onUpload, onOpenBill }) {
     loadBills()
   }, [])
 
-  /**
-   * 🔒 USER-SCOPED VIEW
-   * If backend already sends user_id → strict filter
-   * If not → fallback to all (demo-safe)
-   */
-  const scopedBills = useMemo(() => {
-    if (!Array.isArray(allBills)) return []
+  // 🔒 Bills scoped to logged-in user
+  const myBills = useMemo(() => {
+    if (!Array.isArray(bills)) return []
+    if (bills.length > 0 && "user_id" in bills[0]) {
+      return bills.filter((b) => b.user_id === user.id)
+    }
+    return bills
+  }, [bills, user.id])
 
-    // Backend-ready path
-    if (allBills.length > 0 && "user_id" in allBills[0]) {
-      return allBills.filter(
-        (b) => b.user_id === user.id
-      )
+  // 📊 Analytics
+  const analytics = useMemo(() => {
+    if (myBills.length === 0) {
+      return {
+        totalSpend: 0,
+        billCount: 0,
+        avgBill: 0,
+        avgConfidence: 0
+      }
     }
 
-    // Fallback (until backend adds user_id)
-    return allBills
-  }, [allBills, user.id])
+    const totalSpend = myBills.reduce(
+      (sum, b) => sum + (b.final_total || 0),
+      0
+    )
+
+    const avgBill = totalSpend / myBills.length
+
+    const confidences = myBills
+      .map((b) => b.final_confidence)
+      .filter((c) => c != null)
+
+    const avgConfidence =
+      confidences.length > 0
+        ? confidences.reduce((s, c) => s + c, 0) /
+          confidences.length
+        : 0
+
+    return {
+      totalSpend: totalSpend.toFixed(2),
+      billCount: myBills.length,
+      avgBill: avgBill.toFixed(2),
+      avgConfidence: (avgConfidence * 100).toFixed(0)
+    }
+  }, [myBills])
 
   return (
     <div className="container">
-      {/* Header */}
+      {/* HEADER */}
       <div
         style={{
           display: "flex",
@@ -53,31 +79,52 @@ function DashboardPage({ onUpload, onOpenBill }) {
         }}
       >
         <div>
-          <h2>
-            {isCustomer && "🧾 My Bills"}
-            {isVendor && "🏪 Store Dashboard"}
-          </h2>
-          <p className="muted">
-            {user.email} · {user.role}
-          </p>
+          <h2>📊 My Dashboard</h2>
+          <p className="muted">{user.email}</p>
         </div>
 
-        {isCustomer && (
-          <button onClick={onUpload}>
-            + Upload New Bill
-          </button>
-        )}
+        <button onClick={onUpload}>+ Upload New Bill</button>
       </div>
 
-      {/* Content */}
+      {/* ANALYTICS */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 16,
+          marginBottom: 32
+        }}
+      >
+        <div className="card">
+          <h4>Total Spend</h4>
+          <p style={{ fontSize: 24 }}>₹ {analytics.totalSpend}</p>
+        </div>
+
+        <div className="card">
+          <h4>Total Bills</h4>
+          <p style={{ fontSize: 24 }}>{analytics.billCount}</p>
+        </div>
+
+        <div className="card">
+          <h4>Avg Bill Value</h4>
+          <p style={{ fontSize: 24 }}>₹ {analytics.avgBill}</p>
+        </div>
+
+        <div className="card">
+          <h4>Avg OCR Confidence</h4>
+          <p style={{ fontSize: 24 }}>
+            {analytics.avgConfidence}%
+          </p>
+        </div>
+      </div>
+
+      {/* BILL LIST */}
       {loading ? (
         <p className="muted">Loading bills…</p>
-      ) : scopedBills.length === 0 ? (
+      ) : myBills.length === 0 ? (
         <div className="card">
           <p className="muted">
-            {isCustomer
-              ? "You haven’t uploaded any bills yet."
-              : "No bills available for this account."}
+            You haven’t uploaded any bills yet.
           </p>
         </div>
       ) : (
@@ -92,7 +139,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
               </tr>
             </thead>
             <tbody>
-              {scopedBills.map((b) => (
+              {myBills.map((b) => (
                 <tr
                   key={b.bill_id}
                   style={{ cursor: "pointer" }}
@@ -102,9 +149,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
                   <td>{b.created_at}</td>
                   <td>₹ {b.final_total}</td>
                   <td>
-                    <span className="badge ok">
-                      {((b.final_confidence ?? 0) * 100).toFixed(0)}%
-                    </span>
+                    {((b.final_confidence ?? 0) * 100).toFixed(0)}%
                   </td>
                 </tr>
               ))}

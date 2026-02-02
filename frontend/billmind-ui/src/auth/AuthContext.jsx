@@ -2,6 +2,16 @@ import { createContext, useContext, useEffect, useState } from "react"
 
 const AuthContext = createContext(null)
 
+// simple deterministic hash
+function emailToUserId(email) {
+  let hash = 0
+  for (let i = 0; i < email.length; i++) {
+    hash = (hash << 5) - hash + email.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -14,11 +24,10 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }, [])
 
-  const login = (email, role = "customer") => {
+  const login = (email) => {
     const fakeUser = {
-      id: Date.now(),          // user_id placeholder
+      id: emailToUserId(email), // ✅ STABLE
       email,
-      role,                    // customer | vendor
       created_at: new Date().toISOString()
     }
 
@@ -29,8 +38,8 @@ export function AuthProvider({ children }) {
     setUser(fakeUser)
   }
 
-  const signup = (email, role = "customer") => {
-    login(email, role)
+  const signup = (email) => {
+    login(email)
   }
 
   const logout = () => {
@@ -38,20 +47,9 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
-  const isCustomer = user?.role === "customer"
-  const isVendor = user?.role === "vendor"
-
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        login,
-        signup,
-        logout,
-        isCustomer,
-        isVendor,
-        loading
-      }}
+      value={{ user, login, signup, logout, loading }}
     >
       {children}
     </AuthContext.Provider>
