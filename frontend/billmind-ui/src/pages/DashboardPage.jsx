@@ -1,17 +1,19 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import axios from "axios"
+import { useAuth } from "../auth/AuthContext"
 
 function DashboardPage({ onUpload, onOpenBill }) {
-  const [bills, setBills] = useState([])
+  const { user, isCustomer, isVendor } = useAuth()
+  const [allBills, setAllBills] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadBills = async () => {
       try {
         const res = await axios.get("http://localhost:8000/bills")
-        setBills(res.data)
+        setAllBills(res.data || [])
       } catch {
-        setBills([])
+        setAllBills([])
       } finally {
         setLoading(false)
       }
@@ -20,8 +22,28 @@ function DashboardPage({ onUpload, onOpenBill }) {
     loadBills()
   }, [])
 
+  /**
+   * 🔒 USER-SCOPED VIEW
+   * If backend already sends user_id → strict filter
+   * If not → fallback to all (demo-safe)
+   */
+  const scopedBills = useMemo(() => {
+    if (!Array.isArray(allBills)) return []
+
+    // Backend-ready path
+    if (allBills.length > 0 && "user_id" in allBills[0]) {
+      return allBills.filter(
+        (b) => b.user_id === user.id
+      )
+    }
+
+    // Fallback (until backend adds user_id)
+    return allBills
+  }, [allBills, user.id])
+
   return (
     <div className="container">
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -30,16 +52,32 @@ function DashboardPage({ onUpload, onOpenBill }) {
           marginBottom: 24
         }}
       >
-        <h2>📊 Bill History</h2>
-        <button onClick={onUpload}>+ Upload New Bill</button>
+        <div>
+          <h2>
+            {isCustomer && "🧾 My Bills"}
+            {isVendor && "🏪 Store Dashboard"}
+          </h2>
+          <p className="muted">
+            {user.email} · {user.role}
+          </p>
+        </div>
+
+        {isCustomer && (
+          <button onClick={onUpload}>
+            + Upload New Bill
+          </button>
+        )}
       </div>
 
+      {/* Content */}
       {loading ? (
         <p className="muted">Loading bills…</p>
-      ) : bills.length === 0 ? (
+      ) : scopedBills.length === 0 ? (
         <div className="card">
           <p className="muted">
-            No bills yet. Upload your first bill.
+            {isCustomer
+              ? "You haven’t uploaded any bills yet."
+              : "No bills available for this account."}
           </p>
         </div>
       ) : (
@@ -54,7 +92,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
               </tr>
             </thead>
             <tbody>
-              {bills.map((b) => (
+              {scopedBills.map((b) => (
                 <tr
                   key={b.bill_id}
                   style={{ cursor: "pointer" }}
@@ -65,7 +103,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
                   <td>₹ {b.final_total}</td>
                   <td>
                     <span className="badge ok">
-                      {(b.confidence * 100).toFixed(0)}%
+                      {((b.final_confidence ?? 0) * 100).toFixed(0)}%
                     </span>
                   </td>
                 </tr>

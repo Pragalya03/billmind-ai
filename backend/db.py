@@ -15,21 +15,25 @@ def get_db_connection():
         return None
     
 
-def insert_bill(image_path):
+def insert_bill(image_path: str, user_id: int | None = None):
     conn = get_db_connection()
-    if not conn:
-        return None
-
     cursor = conn.cursor()
+
     cursor.execute(
-        "INSERT INTO bills (image_path) VALUES (%s)",
-        (image_path,)
+        """
+        INSERT INTO bills (image_path, user_id)
+        VALUES (%s, %s)
+        """,
+        (image_path, user_id)
     )
-    conn.commit()
+
     bill_id = cursor.lastrowid
+    conn.commit()
     cursor.close()
     conn.close()
+
     return bill_id
+
 
 
 def insert_bill_items(bill_id, items):
@@ -217,3 +221,28 @@ def get_bill_path(bill_id: int):
         return None
 
     return row["image_path"]
+
+def get_all_bills():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        """
+        SELECT
+            bill_id,
+            user_id,
+            shop_name,
+            final_total,
+            final_confidence,
+            created_at
+        FROM bills
+        ORDER BY created_at DESC
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return rows

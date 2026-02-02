@@ -3,8 +3,15 @@ import UploadPage from "./pages/UploadPage"
 import OCRReviewPage from "./pages/OCRReviewPage"
 import FinalBillPage from "./pages/FinalBillPage"
 import DashboardPage from "./pages/DashboardPage"
+import LoginPage from "./pages/LoginPage"
+import SignupPage from "./pages/SignupPage"
+import { AuthProvider, useAuth } from "./auth/AuthContext"
+import RequireAuth from "./auth/RequireAuth"
 
-function App() {
+function AppContent() {
+  const { user, loading, logout } = useAuth()
+
+  const [authPage, setAuthPage] = useState("login")
   const [appStage, setAppStage] = useState("dashboard")
   const [billId, setBillId] = useState(null)
   const [draftResult, setDraftResult] = useState(null)
@@ -14,78 +21,116 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme)
   }, [theme])
 
+  if (loading) return null
+
+  // 🔐 AUTH GATE
+  if (!user) {
+    return authPage === "login" ? (
+      <LoginPage
+        onSuccess={() => setAuthPage("login")}
+        onSwitch={() => setAuthPage("signup")}
+      />
+    ) : (
+      <SignupPage
+        onSuccess={() => setAuthPage("login")}
+        onSwitch={() => setAuthPage("login")}
+      />
+    )
+  }
+
   return (
-    <>
-      {/* Top Bar */}
-      <div
-        style={{
-          padding: "12px 20px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}
-      >
-        <strong>BillMind AI</strong>
-
-        <button
-          className="secondary"
-          onClick={() =>
-            setTheme(theme === "light" ? "dark" : "light")
-          }
+    <RequireAuth>
+      <>
+        {/* Top Bar */}
+        <div
+          style={{
+            padding: "12px 20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}
         >
-          {theme === "light" ? "🌙 Dark" : "☀️ Light"}
-        </button>
-      </div>
+          <strong>BillMind AI</strong>
 
-      {appStage === "dashboard" && (
-        <DashboardPage
-          onUpload={() => setAppStage("upload")}
-          onOpenBill={(id) => {
-            setBillId(id)
-            setAppStage("view")
-          }}
-        />
-      )}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              className="secondary"
+              onClick={() =>
+                setTheme(theme === "light" ? "dark" : "light")
+              }
+            >
+              {theme === "light" ? "🌙 Dark" : "☀️ Light"}
+            </button>
 
-      {appStage === "upload" && (
-        <UploadPage
-          onUploaded={(data) => {
-            setBillId(data.bill_id)
-            setDraftResult(data)
-            setAppStage("review")
-          }}
-        />
-      )}
+            <button
+              onClick={() => {
+                logout()
+                setAppStage("dashboard")
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
 
-      {appStage === "review" && (
-        <OCRReviewPage
-          billId={billId}
-          reviewItems={draftResult?.review_items || []}
-          onContinue={() => setAppStage("final")}
-        />
-      )}
+        {/* ========== PROTECTED APP FLOW ========== */}
 
-      {appStage === "final" && (
-        <FinalBillPage
-          billId={billId}
-          mode="edit"
-          onDone={() => {
-            setBillId(null)
-            setDraftResult(null)
-            setAppStage("dashboard")
-          }}
-        />
-      )}
+        {appStage === "dashboard" && (
+          <DashboardPage
+            onUpload={() => setAppStage("upload")}
+            onOpenBill={(id) => {
+              setBillId(id)
+              setAppStage("view")
+            }}
+          />
+        )}
 
-      {appStage === "view" && (
-        <FinalBillPage
-          billId={billId}
-          mode="readonly"
-          onDone={() => setAppStage("dashboard")}
-        />
-      )}
-    </>
+        {appStage === "upload" && (
+          <UploadPage
+            onUploaded={(data) => {
+              setBillId(data.bill_id)
+              setDraftResult(data)
+              setAppStage("review")
+            }}
+          />
+        )}
+
+        {appStage === "review" && (
+          <OCRReviewPage
+            billId={billId}
+            reviewItems={draftResult?.review_items || []}
+            onContinue={() => setAppStage("final")}
+          />
+        )}
+
+        {appStage === "final" && (
+          <FinalBillPage
+            billId={billId}
+            mode="edit"
+            onDone={() => {
+              setBillId(null)
+              setDraftResult(null)
+              setAppStage("dashboard")
+            }}
+          />
+        )}
+
+        {appStage === "view" && (
+          <FinalBillPage
+            billId={billId}
+            mode="readonly"
+            onDone={() => setAppStage("dashboard")}
+          />
+        )}
+      </>
+    </RequireAuth>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
+}

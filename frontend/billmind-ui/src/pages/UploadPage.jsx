@@ -1,7 +1,9 @@
 import { useState } from "react"
 import axios from "axios"
+import { useAuth } from "../auth/AuthContext"
 
 function UploadPage({ onUploaded }) {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
 
   const handleFile = async (e) => {
@@ -10,8 +12,12 @@ function UploadPage({ onUploaded }) {
 
     try {
       setLoading(true)
+
       const form = new FormData()
       form.append("file", file)
+
+      // 🔗 LINK BILL TO USER
+      form.append("user_id", user.id)
 
       const res = await axios.post(
         "http://localhost:8000/upload",
@@ -20,42 +26,35 @@ function UploadPage({ onUploaded }) {
 
       onUploaded(res.data)
     } catch (err) {
-      alert("❌ Upload failed")
       console.error(err)
+      alert("❌ Failed to upload bill")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 480,
-        margin: "80px auto",
-        padding: 24,
-        background: "#ffffff",
-        borderRadius: 12,
-        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
-        textAlign: "center"
-      }}
-    >
-      <h2 style={{ marginBottom: 8 }}>📄 BillMind AI</h2>
-      <p style={{ color: "#6b7280", marginBottom: 24 }}>
-        Upload a handwritten bill or receipt
-      </p>
-
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFile}
-        disabled={loading}
-      />
-
-      {loading && (
-        <p style={{ marginTop: 16 }}>
-          🧠 Reading handwriting…
+    <div className="container">
+      <div className="card" style={{ maxWidth: 520, margin: "60px auto" }}>
+        <h2>Upload Bill</h2>
+        <p className="muted">
+          Upload a handwritten bill or receipt.
         </p>
-      )}
+
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFile}
+          disabled={loading}
+          style={{ marginTop: 16 }}
+        />
+
+        {loading && (
+          <p className="muted" style={{ marginTop: 12 }}>
+            ⏳ Processing bill…
+          </p>
+        )}
+      </div>
     </div>
   )
 }
