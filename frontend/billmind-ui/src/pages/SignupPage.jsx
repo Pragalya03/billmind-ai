@@ -4,42 +4,49 @@ import { useAuth } from "../auth/AuthContext"
 function SignupPage({ onSuccess, onSwitch }) {
   const { signup } = useAuth()
   const [email, setEmail] = useState("")
-  const [role, setRole] = useState("customer")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState(null)
 
-  const handleSignup = () => {
-    if (!email) return alert("Enter email")
-    signup(email, role)
-    onSuccess()
+  const handleSignup = async () => {
+    try {
+      setError(null)
+      if (!email || !password) {
+        return setError("Email and password required")
+      }
+      await signup(email, password)
+      onSuccess()
+    } catch (e) {
+      setError(
+        e.response?.data?.detail || "Signup failed"
+      )
+    }
   }
 
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: 420, margin: "80px auto" }}>
-        <h2>Create your account</h2>
-        <p className="muted">Demo mode · no password</p>
+        <h2>Create Account</h2>
+
+        {error && <p style={{ color: "red" }}>{error}</p>}
 
         <input
           type="email"
-          placeholder="you@example.com"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           style={{ width: "100%", marginTop: 12 }}
         />
 
-        <div style={{ marginTop: 14 }}>
-          <label className="muted">Account type</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            style={{ width: "100%", marginTop: 6 }}
-          >
-            <option value="customer">Customer</option>
-            <option value="vendor">Vendor</option>
-          </select>
-        </div>
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ width: "100%", marginTop: 12 }}
+        />
 
         <button
-          style={{ width: "100%", marginTop: 18 }}
+          style={{ width: "100%", marginTop: 16 }}
           onClick={handleSignup}
         >
           Sign Up
@@ -50,7 +57,7 @@ function SignupPage({ onSuccess, onSwitch }) {
           style={{ marginTop: 12, cursor: "pointer" }}
           onClick={onSwitch}
         >
-          Already have an account? Login
+          Already registered? Login
         </p>
       </div>
     </div>

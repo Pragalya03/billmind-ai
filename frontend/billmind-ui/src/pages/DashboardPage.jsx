@@ -11,8 +11,10 @@ function DashboardPage({ onUpload, onOpenBill }) {
     const loadBills = async () => {
       try {
         const res = await axios.get("http://localhost:8000/bills")
-        setBills(res.data || [])
-      } catch {
+        console.log("📦 RAW /bills RESPONSE:", res.data)
+        setBills(Array.isArray(res.data) ? res.data : [])
+      } catch (e) {
+        console.error("❌ Failed to load bills", e)
         setBills([])
       } finally {
         setLoading(false)
@@ -22,54 +24,37 @@ function DashboardPage({ onUpload, onOpenBill }) {
     loadBills()
   }, [])
 
-  // 🔒 Bills scoped to logged-in user
+  // 🔥 SAFE USER ID
+  const userId = user?.id ? String(user.id) : null
+
+  // 🔥 SAFE FILTER WITH LOGGING
   const myBills = useMemo(() => {
-    if (!Array.isArray(bills)) return []
-    if (bills.length > 0 && "user_id" in bills[0]) {
-      return bills.filter((b) => b.user_id === user.id)
+    if (!userId) {
+      console.warn("⚠️ No userId yet")
+      return []
     }
-    return bills
-  }, [bills, user.id])
 
-  // 📊 Analytics
-  const analytics = useMemo(() => {
-    if (myBills.length === 0) {
-      return {
-        totalSpend: 0,
-        billCount: 0,
-        avgBill: 0,
-        avgConfidence: 0
+    const filtered = bills.filter((b) => {
+      const billUserId = String(b.user_id)
+      const match = billUserId === userId
+
+      if (!match) {
+        console.warn(
+          "🚫 BILL FILTERED OUT",
+          "bill.user_id =", billUserId,
+          "user.id =", userId
+        )
       }
-    }
 
-    const totalSpend = myBills.reduce(
-      (sum, b) => sum + (b.final_total || 0),
-      0
-    )
+      return match
+    })
 
-    const avgBill = totalSpend / myBills.length
-
-    const confidences = myBills
-      .map((b) => b.final_confidence)
-      .filter((c) => c != null)
-
-    const avgConfidence =
-      confidences.length > 0
-        ? confidences.reduce((s, c) => s + c, 0) /
-          confidences.length
-        : 0
-
-    return {
-      totalSpend: totalSpend.toFixed(2),
-      billCount: myBills.length,
-      avgBill: avgBill.toFixed(2),
-      avgConfidence: (avgConfidence * 100).toFixed(0)
-    }
-  }, [myBills])
+    console.log("✅ MY BILLS:", filtered)
+    return filtered
+  }, [bills, userId])
 
   return (
     <div className="container">
-      {/* HEADER */}
       <div
         style={{
           display: "flex",
@@ -80,51 +65,32 @@ function DashboardPage({ onUpload, onOpenBill }) {
       >
         <div>
           <h2>📊 My Dashboard</h2>
-          <p className="muted">{user.email}</p>
+          <p className="muted">
+            Logged in as: {user?.email}
+          </p>
+          <p className="muted">
+            User ID (session): {userId}
+          </p>
         </div>
 
         <button onClick={onUpload}>+ Upload New Bill</button>
       </div>
 
-      {/* ANALYTICS */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 16,
-          marginBottom: 32
-        }}
-      >
-        <div className="card">
-          <h4>Total Spend</h4>
-          <p style={{ fontSize: 24 }}>₹ {analytics.totalSpend}</p>
-        </div>
-
-        <div className="card">
-          <h4>Total Bills</h4>
-          <p style={{ fontSize: 24 }}>{analytics.billCount}</p>
-        </div>
-
-        <div className="card">
-          <h4>Avg Bill Value</h4>
-          <p style={{ fontSize: 24 }}>₹ {analytics.avgBill}</p>
-        </div>
-
-        <div className="card">
-          <h4>Avg OCR Confidence</h4>
-          <p style={{ fontSize: 24 }}>
-            {analytics.avgConfidence}%
-          </p>
-        </div>
-      </div>
-
-      {/* BILL LIST */}
       {loading ? (
         <p className="muted">Loading bills…</p>
+      ) : bills.length === 0 ? (
+        <div className="card">
+          <p className="muted">
+            No bills returned from backend.
+          </p>
+        </div>
       ) : myBills.length === 0 ? (
         <div className="card">
           <p className="muted">
-            You haven’t uploaded any bills yet.
+            Bills exist, but none match your user.
+          </p>
+          <p className="muted">
+            Open DevTools → Console for details.
           </p>
         </div>
       ) : (
@@ -132,25 +98,23 @@ function DashboardPage({ onUpload, onOpenBill }) {
           <table>
             <thead>
               <tr>
+                <th>Bill ID</th>
                 <th>Store</th>
-                <th>Date</th>
+                <th>User ID</th>
                 <th>Total</th>
-                <th>Confidence</th>
               </tr>
             </thead>
             <tbody>
               {myBills.map((b) => (
                 <tr
                   key={b.bill_id}
-                  style={{ cursor: "pointer" }}
                   onClick={() => onOpenBill(b.bill_id)}
+                  style={{ cursor: "pointer" }}
                 >
+                  <td>{b.bill_id}</td>
                   <td>{b.shop_name || "—"}</td>
-                  <td>{b.created_at}</td>
+                  <td>{String(b.user_id)}</td>
                   <td>₹ {b.final_total}</td>
-                  <td>
-                    {((b.final_confidence ?? 0) * 100).toFixed(0)}%
-                  </td>
                 </tr>
               ))}
             </tbody>

@@ -4,9 +4,11 @@ from db import get_all_bills
 router = APIRouter()
 
 @router.get("/bills")
-def list_bills():
-    """
-    Return all bills.
-    Frontend will scope by user_id for now.
-    """
-    return get_all_bills()
+def get_bills():
+    rows = get_all_bills()
+
+    for r in rows:
+        if "user_id" in r and r["user_id"] is not None:
+            r["user_id"] = str(r["user_id"])  # 🔥 CRITICAL
+
+    return rows

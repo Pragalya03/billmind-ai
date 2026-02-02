@@ -15,7 +15,8 @@ def get_db_connection():
         return None
     
 
-def insert_bill(image_path: str, user_id: int | None = None):
+def insert_bill(image_path: str, user_id: int):
+    print("🔥 INSERTING BILL WITH USER_ID:", user_id)
     conn = get_db_connection()
     cursor = conn.cursor()
 

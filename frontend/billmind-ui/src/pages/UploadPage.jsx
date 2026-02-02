@@ -10,14 +10,13 @@ function UploadPage({ onUploaded }) {
     const file = e.target.files[0]
     if (!file) return
 
+    console.log("🟢 FRONTEND USER_ID:", user.id, typeof user.id)
+
     try {
       setLoading(true)
-
       const form = new FormData()
       form.append("file", file)
-
-      // 🔗 LINK BILL TO USER
-      form.append("user_id", user.id)
+      form.append("user_id", user.id) // 🔥 STRING, NOT NUMBER
 
       const res = await axios.post(
         "http://localhost:8000/upload",
@@ -25,9 +24,11 @@ function UploadPage({ onUploaded }) {
       )
 
       onUploaded(res.data)
-    } catch (err) {
-      console.error(err)
-      alert("❌ Failed to upload bill")
+    } catch (e) {
+      alert(
+        e.response?.data?.detail || "Upload failed"
+      )
+      console.error(e)
     } finally {
       setLoading(false)
     }
@@ -35,25 +36,16 @@ function UploadPage({ onUploaded }) {
 
   return (
     <div className="container">
-      <div className="card" style={{ maxWidth: 520, margin: "60px auto" }}>
+      <div className="card">
         <h2>Upload Bill</h2>
-        <p className="muted">
-          Upload a handwritten bill or receipt.
-        </p>
 
         <input
           type="file"
           accept="image/*"
           onChange={handleFile}
-          disabled={loading}
-          style={{ marginTop: 16 }}
         />
 
-        {loading && (
-          <p className="muted" style={{ marginTop: 12 }}>
-            ⏳ Processing bill…
-          </p>
-        )}
+        {loading && <p className="muted">Processing…</p>}
       </div>
     </div>
   )

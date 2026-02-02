@@ -1,5 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form
-from pydantic import BaseModel
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 import os
 import uuid
 
@@ -8,7 +7,8 @@ from db import (
     insert_bill,
     insert_bill_items,
     update_bill_summary,
-    delete_bill_items
+    delete_bill_items,
+    get_db_connection
 )
 
 router = APIRouter()
@@ -22,8 +22,37 @@ UPLOAD_DIR = "uploads/bills"
 @router.post("/upload")
 async def upload_bill(
     file: UploadFile = File(...),
-    user_id: int | None = Form(default=None)
+    user_id: int = Form(...)
 ):
+    user_id = int(user_id)
+    # -----------------------------
+    # 🔥 DEBUG: USER ID RECEIVED
+    # -----------------------------
+    print("🔥 UPLOAD USER_ID RECEIVED:", user_id)
+
+    # -----------------------------
+    # 🔒 HARD FK PRECHECK
+    # -----------------------------
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM users WHERE user_id = %s",
+        (user_id,)
+    )
+    exists = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if not exists:
+        # 🚫 Fail FAST before MySQL FK explodes
+        raise HTTPException(
+            status_code=400,
+            detail=f"User does not exist: user_id={user_id}"
+        )
+
+    # -----------------------------
+    # FILE SAVE
+    # -----------------------------
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
     ext = os.path.splitext(file.filename)[1]
@@ -33,18 +62,32 @@ async def upload_bill(
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
-    # 🔗 Insert bill WITH user_id (if provided)
+    # -----------------------------
+    # 🔗 INSERT BILL (USER-AWARE)
+    # -----------------------------
+    print("🔥 INSERTING BILL WITH USER_ID:", user_id)
+
     bill_id = insert_bill(
         image_path=file_path,
         user_id=user_id
     )
 
+    # -----------------------------
+    # OCR PIPELINE
+    # -----------------------------
     result = process_bill(file_path)
 
+    # -----------------------------
+    # ITEMS (DRAFT)
+    # -----------------------------
     insert_bill_items(bill_id, result["table"])
 
+    # -----------------------------
+    # INITIAL TOTAL
+    # -----------------------------
     final_total = sum(
-        item["line_total"] for item in result["table"]
+        item["line_total"]
+        for item in result["table"]
         if item.get("line_total") is not None
     )
 
@@ -57,6 +100,9 @@ async def upload_bill(
         confidence=result["final_confidence"]
     )
 
+    # -----------------------------
+    # RESPONSE
+    # -----------------------------
     return {
         "bill_id": bill_id,
         **result

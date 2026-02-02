@@ -1,3 +1,4 @@
+from routes.auth import router as auth_router
 from routes.bills import router as bills_router
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,3 +30,4 @@ app.include_router(correction_router)
 app.include_router(save_router)
 app.include_router(reprocess_router)
 app.include_router(bills_router)
+app.include_router(auth_router)

@@ -4,26 +4,44 @@ import { useAuth } from "../auth/AuthContext"
 function LoginPage({ onSuccess, onSwitch }) {
   const { login } = useAuth()
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState(null)
 
-  const handleLogin = () => {
-    if (!email) return alert("Enter email")
-    login(email, "customer")
-    onSuccess()
+  const handleLogin = async () => {
+    try {
+      setError(null)
+      if (!email || !password) {
+        return setError("Email and password required")
+      }
+      await login(email, password)
+      onSuccess()
+    } catch (e) {
+      setError(
+        e.response?.data?.detail || "Login failed"
+      )
+    }
   }
 
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: 420, margin: "80px auto" }}>
-        <h2>Login to BillMind AI</h2>
-        <p className="muted">
-          Use any email — fake auth for now
-        </p>
+        <h2>Login</h2>
+
+        {error && <p style={{ color: "red" }}>{error}</p>}
 
         <input
           type="email"
-          placeholder="you@example.com"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          style={{ width: "100%", marginTop: 12 }}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           style={{ width: "100%", marginTop: 12 }}
         />
 
@@ -39,7 +57,7 @@ function LoginPage({ onSuccess, onSwitch }) {
           style={{ marginTop: 12, cursor: "pointer" }}
           onClick={onSwitch}
         >
-          Don’t have an account? Sign up
+          New user? Create account
         </p>
       </div>
     </div>
