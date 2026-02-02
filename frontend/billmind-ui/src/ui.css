@@ -4,6 +4,7 @@
   --text: #111827;
   --muted: #6b7280;
   --primary: #111827;
+  --secondary: #374151;
   --accent: #0ea5e9;
   --danger: #7f1d1d;
   --warning-bg: #fff7ed;
@@ -11,12 +12,26 @@
   --border: #e5e7eb;
 }
 
+/* 🌙 Dark mode overrides */
+[data-theme="dark"] {
+  --bg: #0b0f19;
+  --card: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --primary: #e5e7eb;
+  --secondary: #4b5563;
+  --warning-bg: #1f2937;
+  --success-bg: #022c22;
+  --border: #1f2937;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
-/* Layout helpers */
+/* Layout */
 .container {
   max-width: 960px;
   margin: 40px auto;
@@ -27,7 +42,7 @@ body {
   background: var(--card);
   border-radius: 14px;
   padding: 20px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.12);
 }
 
 /* Typography */
@@ -48,18 +63,20 @@ p.muted {
 /* Buttons */
 button {
   background: var(--primary);
-  color: white;
+  color: var(--bg);
   border-radius: 10px;
   padding: 10px 18px;
   font-size: 14px;
 }
 
 button.secondary {
-  background: #374151;
+  background: var(--secondary);
+  color: white;
 }
 
 button.danger {
   background: var(--danger);
+  color: white;
 }
 
 button:disabled {
@@ -77,7 +94,7 @@ th {
   font-size: 13px;
   color: var(--muted);
   padding: 12px;
-  background: #f3f4f6;
+  background: var(--border);
 }
 
 td {
@@ -95,10 +112,10 @@ td {
 
 .badge.warn {
   background: var(--warning-bg);
-  color: #92400e;
+  color: #fbbf24;
 }
 
 .badge.ok {
   background: var(--success-bg);
-  color: #065f46;
+  color: #10b981;
 }

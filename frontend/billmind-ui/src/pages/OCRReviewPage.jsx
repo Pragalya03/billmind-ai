@@ -1,5 +1,6 @@
 import { useState } from "react"
 import axios from "axios"
+import { explainLowConfidence } from "../utils/confidenceExplain"
 
 function OCRReviewPage({ billId, reviewItems, onContinue }) {
   const [items, setItems] = useState(reviewItems)
@@ -14,7 +15,8 @@ function OCRReviewPage({ billId, reviewItems, onContinue }) {
       setSavingId(text)
       await axios.post("http://localhost:8000/correct", payload)
       removeItem(text)
-    } catch {
+    } catch (err) {
+      console.error(err)
       alert("❌ Failed to save correction")
     } finally {
       setSavingId(null)
@@ -25,7 +27,7 @@ function OCRReviewPage({ billId, reviewItems, onContinue }) {
     <div className="container">
       <h2>Review OCR Results</h2>
       <p className="muted">
-        Help BillMind AI by confirming a few uncertain readings.
+        BillMind AI flagged these words because it was unsure about them.
       </p>
 
       {items.length === 0 ? (
@@ -35,13 +37,27 @@ function OCRReviewPage({ billId, reviewItems, onContinue }) {
       ) : (
         items.map((item, i) => (
           <div key={i} className="card" style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 20
+              }}
+            >
               <div>
                 <strong>“{item.text}”</strong>
+
                 <div className="badge warn" style={{ marginTop: 6 }}>
                   Low confidence · {(item.confidence * 100).toFixed(0)}%
                 </div>
-                <p className="muted">Context: {item.label || "—"}</p>
+
+                <p className="muted" style={{ marginTop: 6 }}>
+                  {explainLowConfidence(item)}
+                </p>
+
+                <p className="muted" style={{ fontSize: 12 }}>
+                  Context: {item.label || "—"}
+                </p>
               </div>
 
               <div style={{ display: "flex", gap: 8 }}>

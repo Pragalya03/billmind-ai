@@ -1,18 +1,16 @@
 import { useEffect, useState } from "react"
 import axios from "axios"
 
-function DashboardPage({ onUpload }) {
+function DashboardPage({ onUpload, onOpenBill }) {
   const [bills, setBills] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadBills = async () => {
       try {
-        // This endpoint can be added later if not present
         const res = await axios.get("http://localhost:8000/bills")
         setBills(res.data)
       } catch {
-        // Graceful fallback (important for demos)
         setBills([])
       } finally {
         setLoading(false)
@@ -32,7 +30,7 @@ function DashboardPage({ onUpload }) {
           marginBottom: 24
         }}
       >
-        <h2>📊 BillMind Dashboard</h2>
+        <h2>📊 Bill History</h2>
         <button onClick={onUpload}>+ Upload New Bill</button>
       </div>
 
@@ -41,7 +39,7 @@ function DashboardPage({ onUpload }) {
       ) : bills.length === 0 ? (
         <div className="card">
           <p className="muted">
-            No bills yet. Upload your first handwritten bill to get started.
+            No bills yet. Upload your first bill.
           </p>
         </div>
       ) : (
@@ -57,7 +55,11 @@ function DashboardPage({ onUpload }) {
             </thead>
             <tbody>
               {bills.map((b) => (
-                <tr key={b.bill_id}>
+                <tr
+                  key={b.bill_id}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => onOpenBill(b.bill_id)}
+                >
                   <td>{b.shop_name || "—"}</td>
                   <td>{b.created_at}</td>
                   <td>₹ {b.final_total}</td>
