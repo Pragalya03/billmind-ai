@@ -31,6 +31,13 @@ function BillDetails({ billId, onDone }) {
   const recalcLine = (i) =>
     Number(i.quantity || 0) * Number(i.unit_price || 0)
 
+  const detectedTotal = Number(bill.detected_total || 0)
+  const calculatedTotal = Number(bill.final_total || 0)
+
+  const totalsMatch =
+    detectedTotal > 0 &&
+    Math.abs(detectedTotal - calculatedTotal) < 0.01
+
   // =========================
   // SAVE EDITS
   // =========================
@@ -83,6 +90,8 @@ function BillDetails({ billId, onDone }) {
           }
         />
       </div>
+
+
 
       {/* ITEMS */}
       <div className="card">
@@ -173,6 +182,35 @@ function BillDetails({ billId, onDone }) {
           </button>
         )}
       </div>
+
+      {/*Totals*/}  
+      <div className="card">
+      <h3>Totals Check</h3>
+
+      <p>
+        <strong>Detected Total (OCR):</strong>{" "}
+        ₹ {detectedTotal || "—"}
+      </p>
+
+      <p>
+        <strong>Calculated Total:</strong>{" "}
+        ₹ {calculatedTotal}
+      </p>
+
+      <p
+        style={{
+          marginTop: 8,
+          fontWeight: "bold",
+          color: totalsMatch ? "green" : "orange"
+        }}
+      >
+        {detectedTotal === 0
+          ? "ℹ️ No detected total from OCR"
+          : totalsMatch
+          ? "✅ Totals match"
+          : "⚠️ Totals do not match"}
+      </p>
+    </div>
 
       {/* ACTIONS */}
       <div style={{ marginTop: 16, display: "flex", gap: 12 }}>

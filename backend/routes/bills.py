@@ -124,7 +124,8 @@ def get_bill_details(bill_id: int):
             shop_address,
             bill_date,
             created_at,
-            final_total
+            final_total,
+            detected_total
         FROM bills
         WHERE bill_id = %s
         """,
