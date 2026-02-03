@@ -42,39 +42,67 @@ function AppContent() {
   return (
     <RequireAuth>
       <>
-        {/* Top Bar */}
-        <div
-          style={{
-            padding: "12px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}
-        >
-          <strong>BillMind AI</strong>
+        {/* Top App Bar */}
+<div
+  style={{
+    padding: "14px 24px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottom: "1px solid var(--border)",
+    background: "var(--card)",
+    position: "sticky",
+    top: 0,
+    zIndex: 10
+  }}
+>
+  {/* Logo + Brand */}
+  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <img
+      src="/icon.png"
+      alt="BillMind AI"
+      style={{
+        height: 36,
+        width: 36,
+        objectFit: "contain"
+      }}
+    />
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              className="secondary"
-              onClick={() =>
-                setTheme(theme === "light" ? "dark" : "light")
-              }
-            >
-              {theme === "light" ? "🌙 Dark" : "☀️ Light"}
-            </button>
+    <div style={{ lineHeight: 1.1 }}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>
+        BillMind AI
+      </div>
+      <div style={{ fontSize: 12, color: "var(--muted)" }}>
+        Smart Bill Intelligence
+      </div>
+    </div>
+  </div>
 
-            <button
-              onClick={() => {
-                logout()
-                setBillId(null)
-                setDraftResult(null)
-                setAppStage("dashboard")
-              }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+  {/* Actions */}
+  <div style={{ display: "flex", gap: 12 }}>
+    <button
+      className="secondary"
+      onClick={() =>
+        setTheme(theme === "light" ? "dark" : "light")
+      }
+    >
+      {theme === "light" ? "🌙 Dark" : "☀️ Light"}
+    </button>
+
+    <button
+      className="danger"
+      onClick={() => {
+        logout()
+        setBillId(null)
+        setDraftResult(null)
+        setAppStage("dashboard")
+      }}
+    >
+      Logout
+    </button>
+  </div>
+</div>
+
 
         {/* ========== PROTECTED APP FLOW ========== */}
 
