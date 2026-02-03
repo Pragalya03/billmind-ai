@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import axios from "axios"
 
 function BillDetails({ billId, onDone }) {
@@ -8,8 +8,13 @@ function BillDetails({ billId, onDone }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // =========================
+  // LOAD BILL
+  // =========================
   useEffect(() => {
     if (!billId) return
+
+    setLoading(true)
 
     axios
       .get(`http://localhost:8000/bills/${billId}`)
@@ -20,6 +25,25 @@ function BillDetails({ billId, onDone }) {
       .finally(() => setLoading(false))
   }, [billId])
 
+  // =========================
+  // CALCULATIONS (HOOKS FIRST)
+  // =========================
+  const recalcLine = (i) =>
+    Number(i?.quantity || 0) * Number(i?.unit_price || 0)
+
+  const recalculatedTotal = useMemo(() => {
+    if (!draft?.items) return 0
+    return Number(
+      draft.items
+        .map(recalcLine)
+        .reduce((sum, v) => sum + v, 0)
+        .toFixed(2)
+    )
+  }, [draft])
+
+  // =========================
+  // EARLY RETURNS
+  // =========================
   if (loading) {
     return (
       <div className="container" style={{ padding: "64px 0" }}>
@@ -38,26 +62,35 @@ function BillDetails({ billId, onDone }) {
 
   const data = isEditing ? draft : bill
 
-  const recalcLine = (i) =>
-    Number(i.quantity || 0) * Number(i.unit_price || 0)
-
   const detectedTotal = Number(bill.detected_total || 0)
-  const calculatedTotal = Number(bill.final_total || 0)
+  const calculatedTotal = isEditing
+    ? recalculatedTotal
+    : Number(bill.final_total || 0)
 
   const totalsMatch =
     detectedTotal > 0 &&
     Math.abs(detectedTotal - calculatedTotal) < 0.01
 
+  // =========================
+  // SAVE CHANGES
+  // =========================
   const save = async () => {
     try {
       setSaving(true)
+
       await axios.put(`http://localhost:8000/bills/${billId}`, {
         shop_name: draft.shop_name,
         shop_address: draft.shop_address,
         bill_date: draft.bill_date,
         items: draft.items
       })
-      setBill(draft)
+
+      // 🔥 INSTANT UI UPDATE
+      setBill({
+        ...draft,
+        final_total: recalculatedTotal
+      })
+
       setIsEditing(false)
     } catch (e) {
       console.error(e)
@@ -67,6 +100,9 @@ function BillDetails({ billId, onDone }) {
     }
   }
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div className="container" style={{ padding: "48px 0", maxWidth: 1200 }}>
       {/* TOP NAV */}
@@ -156,7 +192,7 @@ function BillDetails({ billId, onDone }) {
         </div>
       </div>
 
-      {/* ITEMS – POLISHED CONTAINER */}
+      {/* ITEMS */}
       <div
         className="card"
         style={{
@@ -165,7 +201,6 @@ function BillDetails({ billId, onDone }) {
           overflow: "hidden"
         }}
       >
-        {/* Items header */}
         <div
           style={{
             padding: "20px 24px",
@@ -200,7 +235,6 @@ function BillDetails({ billId, onDone }) {
           )}
         </div>
 
-        {/* Table */}
         <div style={{ padding: "8px 24px 16px" }}>
           <table
             style={{
@@ -250,7 +284,6 @@ function BillDetails({ billId, onDone }) {
                       onChange={e => {
                         const items = [...draft.items]
                         items[idx].quantity = e.target.value
-                        items[idx].line_total = recalcLine(items[idx])
                         setDraft({ ...draft, items })
                       }}
                       style={{ width: 70 }}
@@ -265,7 +298,6 @@ function BillDetails({ billId, onDone }) {
                       onChange={e => {
                         const items = [...draft.items]
                         items[idx].unit_price = e.target.value
-                        items[idx].line_total = recalcLine(items[idx])
                         setDraft({ ...draft, items })
                       }}
                       style={{ width: 100 }}
