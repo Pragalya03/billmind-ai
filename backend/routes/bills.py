@@ -1,8 +1,78 @@
 from fastapi import APIRouter, HTTPException
 from db import get_db_connection
+from fastapi import Query, HTTPException
 
 router = APIRouter()  # ❗ NO prefix here
 
+# =========================
+# SEARCH / FILTER BILLS
+# =========================
+@router.get("/bills/search")
+def search_bills(
+    user_id: str = Query(...),
+    q: str | None = Query(None),
+    from_date: str | None = Query(None),
+    to_date: str | None = Query(None),
+    min_amount: float | None = Query(None),
+    max_amount: float | None = Query(None)
+):
+    try:
+        uid = int(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    conditions = ["b.user_id = %s", "b.bill_date IS NOT NULL"]
+    params = [uid]
+
+    if q:
+        conditions.append("LOWER(b.shop_name) LIKE %s")
+        params.append(f"%{q.lower()}%")
+
+    if from_date:
+        conditions.append("b.bill_date >= %s")
+        params.append(from_date)
+
+    if to_date:
+        conditions.append("b.bill_date <= %s")
+        params.append(to_date)
+
+    if min_amount is not None:
+        conditions.append("b.final_total >= %s")
+        params.append(min_amount)
+
+    if max_amount is not None:
+        conditions.append("b.final_total <= %s")
+        params.append(max_amount)
+
+    where_clause = " AND ".join(conditions)
+
+    cursor.execute(
+        f"""
+        SELECT
+            b.bill_id,
+            b.user_id,
+            b.shop_name,
+            b.final_total,
+            b.bill_date
+        FROM bills b
+        WHERE {where_clause}
+        ORDER BY b.bill_date DESC
+        """,
+        tuple(params)
+    )
+
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    # 🔥 BIGINT SAFE
+    for r in rows:
+        r["user_id"] = str(r["user_id"])
+
+    return rows
 
 # =========================
 # GET ALL BILLS (DASHBOARD)
@@ -157,3 +227,4 @@ def update_bill(bill_id: int, payload: dict):
         conn.close()
 
     return {"status": "updated", "final_total": final_total}
+

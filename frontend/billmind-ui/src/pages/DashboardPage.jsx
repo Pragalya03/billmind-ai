@@ -18,20 +18,37 @@ function DashboardPage({ onUpload, onOpenBill }) {
   const [monthlySpend, setMonthlySpend] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // 📅 Date range for PDF
+  // 🔍 Search & filters
+  const [search, setSearch] = useState("")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
+  const [minAmount, setMinAmount] = useState("")
+  const [maxAmount, setMaxAmount] = useState("")
 
   // 🔥 SAFE USER ID (STRING)
   const userId = user?.id ? String(user.id) : null
 
+  // ===============================
+  // LOAD DASHBOARD DATA
+  // ===============================
   useEffect(() => {
+    if (!userId) return
+
     const loadData = async () => {
-      if (!userId) return
+      setLoading(true)
 
       try {
         const [billsRes, analyticsRes] = await Promise.all([
-          axios.get("http://localhost:8000/bills"),
+          axios.get("http://localhost:8000/bills/search", {
+            params: {
+              user_id: userId,
+              q: search || undefined,
+              from_date: fromDate || undefined,
+              to_date: toDate || undefined,
+              min_amount: minAmount || undefined,
+              max_amount: maxAmount || undefined
+            }
+          }),
           axios.get("http://localhost:8000/analytics/monthly-spend", {
             params: { user_id: userId }
           })
@@ -51,15 +68,15 @@ function DashboardPage({ onUpload, onOpenBill }) {
     }
 
     loadData()
-  }, [userId])
+  }, [userId, search, fromDate, toDate, minAmount, maxAmount])
 
-  // 🧠 USER-SCOPED BILLS
+  // 🧠 USER-SCOPED BILLS (extra safety)
   const myBills = useMemo(() => {
     if (!userId) return []
     return bills.filter(b => String(b.user_id) === userId)
   }, [bills, userId])
 
-  // ⬇️ PDF DOWNLOAD HANDLER
+  // ⬇️ PDF DOWNLOAD HANDLER (uses same filters)
   const downloadPdf = () => {
     if (!userId) return
 
@@ -90,40 +107,69 @@ function DashboardPage({ onUpload, onOpenBill }) {
         <div>
           <h2>📊 My Dashboard</h2>
           <p className="muted">Logged in as: {user?.email}</p>
-          <p className="muted">User ID: {userId}</p>
         </div>
 
-        <div style={{ display: "flex", gap: 12 }}>
-          <button onClick={onUpload}>+ Upload New Bill</button>
+        <button onClick={onUpload}>+ Upload New Bill</button>
+      </div>
+
+      {/* 🔍 SEARCH & FILTERS */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <input
+            placeholder="Search by store name…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+
+          <input
+            type="date"
+            value={fromDate}
+            onChange={e => setFromDate(e.target.value)}
+          />
+
+          <input
+            type="date"
+            value={toDate}
+            onChange={e => setToDate(e.target.value)}
+          />
+
+          <input
+            type="number"
+            placeholder="Min ₹"
+            value={minAmount}
+            onChange={e => setMinAmount(e.target.value)}
+          />
+
+          <input
+            type="number"
+            placeholder="Max ₹"
+            value={maxAmount}
+            onChange={e => setMaxAmount(e.target.value)}
+          />
+
+          <button
+            className="secondary"
+            onClick={() => {
+              setSearch("")
+              setFromDate("")
+              setToDate("")
+              setMinAmount("")
+              setMaxAmount("")
+            }}
+          >
+            Clear
+          </button>
         </div>
       </div>
 
-      {/* 📄 PDF CONTROLS */}
-      <div
-        className="card"
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          marginBottom: 24
-        }}
-      >
-        <input
-          type="date"
-          value={fromDate}
-          onChange={e => setFromDate(e.target.value)}
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={e => setToDate(e.target.value)}
-        />
+      {/* 📄 PDF */}
+      <div className="card" style={{ marginBottom: 24 }}>
         <button onClick={downloadPdf}>
           ⬇️ Download PDF Report
         </button>
       </div>
 
-      {/* 📈 MONTHLY SPEND CHART */}
+      {/* 📈 MONTHLY SPEND */}
       <div className="card" style={{ marginBottom: 24 }}>
         <h3>📈 Monthly Spend</h3>
         {monthlySpend.length === 0 ? (
@@ -151,14 +197,14 @@ function DashboardPage({ onUpload, onOpenBill }) {
         <p className="muted">Loading bills…</p>
       ) : myBills.length === 0 ? (
         <div className="card">
-          <p className="muted">No bills yet.</p>
+          <p className="muted">No bills match your search.</p>
         </div>
       ) : (
         <div className="card">
           <table>
             <thead>
               <tr>
-                <th>Bill ID</th>
+                <th>Date</th>
                 <th>Store</th>
                 <th>Total</th>
               </tr>
@@ -170,7 +216,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
                   onClick={() => onOpenBill(b.bill_id)}
                   style={{ cursor: "pointer" }}
                 >
-                  <td>{b.bill_id}</td>
+                  <td>{b.bill_date}</td>
                   <td>{b.shop_name || "—"}</td>
                   <td>₹ {b.final_total}</td>
                 </tr>
