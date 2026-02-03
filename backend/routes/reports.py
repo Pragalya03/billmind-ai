@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use("Agg")  # 🔥 Windows-safe backend
+matplotlib.use("Agg")  # Windows + FastAPI safe
 
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
@@ -21,6 +21,9 @@ def download_pdf(
     start_date: str | None = None,
     end_date: str | None = None
 ):
+    # -------------------------
+    # USER ID SAFETY
+    # -------------------------
     try:
         uid = int(user_id)
     except ValueError:
@@ -29,28 +32,50 @@ def download_pdf(
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
+    # -------------------------
+    # DATE FILTER (bill_date)
+    # -------------------------
     date_filter = ""
     params = [uid]
 
     if start_date:
-        date_filter += " AND b.created_at >= %s"
+        date_filter += " AND b.bill_date >= %s"
         params.append(start_date)
 
     if end_date:
-        date_filter += " AND b.created_at <= %s"
+        date_filter += " AND b.bill_date <= %s"
         params.append(end_date)
 
     # =========================
-    # MONTHLY SPEND
+    # SUMMARY (bill_date)
     # =========================
     cursor.execute(
         f"""
         SELECT
-            DATE_FORMAT(created_at, '%Y-%m') AS month,
-            SUM(final_total) AS total
-        FROM bills
-        WHERE user_id = %s
-        {date_filter.replace("b.", "")}
+            COUNT(*) AS total_bills,
+            SUM(b.final_total) AS total_spend,
+            AVG(b.final_total) AS avg_spend
+        FROM bills b
+        WHERE b.user_id = %s
+          AND b.bill_date IS NOT NULL
+        {date_filter}
+        """,
+        tuple(params)
+    )
+    summary = cursor.fetchone()
+
+    # =========================
+    # MONTHLY SPEND (bill_date)
+    # =========================
+    cursor.execute(
+        f"""
+        SELECT
+            DATE_FORMAT(b.bill_date, '%Y-%m') AS month,
+            SUM(b.final_total) AS total
+        FROM bills b
+        WHERE b.user_id = %s
+          AND b.bill_date IS NOT NULL
+        {date_filter}
         GROUP BY month
         ORDER BY month
         """,
@@ -59,17 +84,18 @@ def download_pdf(
     monthly = cursor.fetchall()
 
     # =========================
-    # STORE-WISE
+    # STORE-WISE SPEND
     # =========================
     cursor.execute(
         f"""
         SELECT
-            shop_name,
-            SUM(final_total) AS total
-        FROM bills
-        WHERE user_id = %s
-        {date_filter.replace("b.", "")}
-        GROUP BY shop_name
+            b.shop_name,
+            SUM(b.final_total) AS total
+        FROM bills b
+        WHERE b.user_id = %s
+          AND b.bill_date IS NOT NULL
+        {date_filter}
+        GROUP BY b.shop_name
         ORDER BY total DESC
         """,
         tuple(params)
@@ -77,15 +103,15 @@ def download_pdf(
     stores = cursor.fetchall()
 
     # =========================
-    # BILLS + ITEMS
+    # BILLS + ITEMS (bill_date)
     # =========================
     cursor.execute(
         f"""
         SELECT
             b.bill_id,
             b.shop_name,
+            b.bill_date,
             b.final_total,
-            b.created_at,
             i.item_name,
             i.quantity,
             i.unit_price,
@@ -93,8 +119,9 @@ def download_pdf(
         FROM bills b
         LEFT JOIN bill_items i ON b.bill_id = i.bill_id
         WHERE b.user_id = %s
+          AND b.bill_date IS NOT NULL
         {date_filter}
-        ORDER BY b.created_at DESC, b.bill_id, i.item_name
+        ORDER BY b.bill_date DESC, b.bill_id
         """,
         tuple(params)
     )
@@ -103,17 +130,19 @@ def download_pdf(
     cursor.close()
     conn.close()
 
-    # =========================
-    # GROUP ITEMS PER BILL
-    # =========================
+    # -------------------------
+    # GROUP ITEMS BY BILL
+    # -------------------------
     bills = {}
     for r in rows:
         bid = r["bill_id"]
+
         if bid not in bills:
             bills[bid] = {
-                "shop": r["shop_name"],
-                "date": r["created_at"],
-                "total": r["final_total"],
+                "bill_id": bid,
+                "shop_name": r["shop_name"],
+                "bill_date": r["bill_date"],
+                "final_total": r["final_total"],
                 "items": []
             }
 
@@ -121,7 +150,7 @@ def download_pdf(
             bills[bid]["items"].append({
                 "name": r["item_name"],
                 "qty": r["quantity"],
-                "price": r["unit_price"],
+                "unit": r["unit_price"],
                 "total": r["line_total"]
             })
 
@@ -130,11 +159,10 @@ def download_pdf(
     # =========================
     tmp_files = []
 
-    def create_chart(x, y, title, xlabel):
+    def create_chart(x, y, title):
         fig, ax = plt.subplots(figsize=(6, 3))
         ax.bar(x, y)
         ax.set_title(title)
-        ax.set_xlabel(xlabel)
         ax.set_ylabel("Amount (₹)")
         plt.xticks(rotation=45, ha="right")
         plt.tight_layout()
@@ -148,15 +176,13 @@ def download_pdf(
     monthly_chart = create_chart(
         [m["month"] for m in monthly],
         [m["total"] for m in monthly],
-        "Monthly Spend",
-        "Month"
+        "Monthly Spend (by Bill Date)"
     )
 
     store_chart = create_chart(
         [s["shop_name"] or "Unknown" for s in stores],
         [s["total"] for s in stores],
-        "Store-wise Spend",
-        "Store"
+        "Store-wise Spend"
     )
 
     # =========================
@@ -166,55 +192,79 @@ def download_pdf(
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # -------- CHART PAGES --------
+    # -------- PAGE 1: CHARTS --------
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(2 * cm, height - 2 * cm, "BillMind AI — Spending Report")
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(
+        2 * cm,
+        height - 3 * cm,
+        f"Date Range: {start_date or 'Beginning'} → {end_date or 'Today'}"
+    )
+
     pdf.drawImage(monthly_chart, 2 * cm, height - 11 * cm, width=16 * cm)
     pdf.showPage()
 
     pdf.drawImage(store_chart, 2 * cm, height - 11 * cm, width=16 * cm)
     pdf.showPage()
 
-    # -------- BILLS + ITEMS --------
+    # -------- PAGE 2: SUMMARY --------
     pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(2 * cm, height - 2 * cm, "Bills & Items")
+    pdf.drawString(2 * cm, height - 2 * cm, "Summary (Based on Bill Date)")
 
-    y = height - 3.5 * cm
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(2 * cm, height - 4 * cm, f"Total Bills: {summary['total_bills']}")
+    pdf.drawString(
+        2 * cm,
+        height - 5 * cm,
+        f"Total Spend: ₹ {summary['total_spend'] or 0:.2f}"
+    )
+    pdf.drawString(
+        2 * cm,
+        height - 6 * cm,
+        f"Average Bill: ₹ {summary['avg_spend'] or 0:.2f}"
+    )
 
-    for bill_id, b in bills.items():
-        if y < 3 * cm:
-            pdf.showPage()
-            pdf.setFont("Helvetica-Bold", 14)
-            pdf.drawString(2 * cm, height - 2 * cm, "Bills & Items (continued)")
-            y = height - 3.5 * cm
+    pdf.showPage()
 
-        # Bill header
-        pdf.setFont("Helvetica-Bold", 10)
+    # -------- BILLS + ITEMS --------
+    for bill in bills.values():
+        pdf.setFont("Helvetica-Bold", 13)
         pdf.drawString(
             2 * cm,
-            y,
-            f"Bill #{bill_id} | {b['shop'] or '—'} | ₹ {b['total']} | {b['date'].strftime('%d %b %Y')}"
+            height - 2 * cm,
+            f"Bill #{bill['bill_id']} — {bill['shop_name'] or '—'}"
         )
-        y -= 0.5 * cm
 
-        # Items
+        pdf.setFont("Helvetica", 10)
+        pdf.drawString(
+            2 * cm,
+            height - 3 * cm,
+            f"Bill Date: {bill['bill_date']}    Total: ₹ {bill['final_total']}"
+        )
+
+        y = height - 4.2 * cm
+        pdf.setFont("Helvetica-Bold", 9)
+        pdf.drawString(2 * cm, y, "Item")
+        pdf.drawString(10 * cm, y, "Qty")
+        pdf.drawString(12 * cm, y, "Unit")
+        pdf.drawString(15 * cm, y, "Total")
+        y -= 0.4 * cm
+
         pdf.setFont("Helvetica", 9)
-        for item in b["items"]:
+        for item in bill["items"]:
             if y < 2 * cm:
                 pdf.showPage()
-                pdf.setFont("Helvetica-Bold", 14)
-                pdf.drawString(2 * cm, height - 2 * cm, "Bills & Items (continued)")
-                pdf.setFont("Helvetica", 9)
-                y = height - 3.5 * cm
+                y = height - 2 * cm
 
-            pdf.drawString(
-                2.5 * cm,
-                y,
-                f"• {item['name']} ({item['qty']} × {item['price']}) = ₹ {item['total']}"
-            )
+            pdf.drawString(2 * cm, y, item["name"][:40])
+            pdf.drawString(10 * cm, y, str(item["qty"]))
+            pdf.drawString(12 * cm, y, f"₹ {item['unit']}")
+            pdf.drawString(15 * cm, y, f"₹ {item['total']}")
             y -= 0.4 * cm
 
-        y -= 0.3 * cm  # spacing after each bill
+        pdf.showPage()
 
     pdf.save()
     buffer.seek(0)
@@ -225,5 +275,7 @@ def download_pdf(
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=billmind_report.pdf"}
+        headers={
+            "Content-Disposition": "attachment; filename=billmind_report.pdf"
+        }
     )
