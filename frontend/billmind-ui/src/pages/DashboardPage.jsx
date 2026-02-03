@@ -18,36 +18,28 @@ function DashboardPage({ onUpload, onOpenBill }) {
   const [monthlySpend, setMonthlySpend] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // 🔍 Search & filters
+  // 🔍 FILTER INPUTS (do NOT auto-search)
   const [search, setSearch] = useState("")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [minAmount, setMinAmount] = useState("")
   const [maxAmount, setMaxAmount] = useState("")
 
-  // 🔥 SAFE USER ID (STRING)
+  // 🔥 SAFE USER ID
   const userId = user?.id ? String(user.id) : null
 
   // ===============================
-  // LOAD DASHBOARD DATA
+  // LOAD ALL BILLS (DEFAULT)
   // ===============================
   useEffect(() => {
     if (!userId) return
 
-    const loadData = async () => {
+    const loadInitialData = async () => {
       setLoading(true)
-
       try {
         const [billsRes, analyticsRes] = await Promise.all([
           axios.get("http://localhost:8000/bills/search", {
-            params: {
-              user_id: userId,
-              q: search || undefined,
-              from_date: fromDate || undefined,
-              to_date: toDate || undefined,
-              min_amount: minAmount || undefined,
-              max_amount: maxAmount || undefined
-            }
+            params: { user_id: userId }
           }),
           axios.get("http://localhost:8000/analytics/monthly-spend", {
             params: { user_id: userId }
@@ -67,16 +59,67 @@ function DashboardPage({ onUpload, onOpenBill }) {
       }
     }
 
-    loadData()
-  }, [userId, search, fromDate, toDate, minAmount, maxAmount])
+    loadInitialData()
+  }, [userId])
 
-  // 🧠 USER-SCOPED BILLS (extra safety)
+  // ===============================
+  // SEARCH HANDLER (MANUAL)
+  // ===============================
+  const runSearch = async () => {
+    if (!userId) return
+
+    setLoading(true)
+    try {
+      const res = await axios.get("http://localhost:8000/bills/search", {
+        params: {
+          user_id: userId,
+          q: search || undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined,
+          min_amount: minAmount || undefined,
+          max_amount: maxAmount || undefined
+        }
+      })
+
+      setBills(Array.isArray(res.data) ? res.data : [])
+    } catch (e) {
+      console.error("❌ Search failed", e)
+      setBills([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ===============================
+  // CLEAR FILTERS
+  // ===============================
+  const clearFilters = async () => {
+    setSearch("")
+    setFromDate("")
+    setToDate("")
+    setMinAmount("")
+    setMaxAmount("")
+
+    if (!userId) return
+
+    setLoading(true)
+    try {
+      const res = await axios.get("http://localhost:8000/bills/search", {
+        params: { user_id: userId }
+      })
+      setBills(Array.isArray(res.data) ? res.data : [])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 🧠 EXTRA SAFETY
   const myBills = useMemo(() => {
     if (!userId) return []
     return bills.filter(b => String(b.user_id) === userId)
   }, [bills, userId])
 
-  // ⬇️ PDF DOWNLOAD HANDLER (uses same filters)
+  // ⬇️ PDF DOWNLOAD (uses date range)
   const downloadPdf = () => {
     if (!userId) return
 
@@ -147,16 +190,9 @@ function DashboardPage({ onUpload, onOpenBill }) {
             onChange={e => setMaxAmount(e.target.value)}
           />
 
-          <button
-            className="secondary"
-            onClick={() => {
-              setSearch("")
-              setFromDate("")
-              setToDate("")
-              setMinAmount("")
-              setMaxAmount("")
-            }}
-          >
+          <button onClick={runSearch}>🔍 Search</button>
+
+          <button className="secondary" onClick={clearFilters}>
             Clear
           </button>
         </div>
@@ -197,7 +233,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
         <p className="muted">Loading bills…</p>
       ) : myBills.length === 0 ? (
         <div className="card">
-          <p className="muted">No bills match your search.</p>
+          <p className="muted">No bills found.</p>
         </div>
       ) : (
         <div className="card">

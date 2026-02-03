@@ -208,3 +208,106 @@ def download_pdf(
             "Content-Disposition": "attachment; filename=billmind_report.pdf"
         }
     )
+
+# =====================================================
+# SINGLE BILL PDF (BillDetails page)
+# =====================================================
+@router.get("/bill/{bill_id}")
+def download_single_bill(bill_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # -------- BILL --------
+    cursor.execute(
+        """
+        SELECT
+            bill_id,
+            shop_name,
+            shop_address,
+            bill_date,
+            final_total
+        FROM bills
+        WHERE bill_id = %s
+        """,
+        (bill_id,)
+    )
+    bill = cursor.fetchone()
+
+    if not bill:
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    # -------- ITEMS --------
+    cursor.execute(
+        """
+        SELECT
+            item_name,
+            quantity,
+            unit_price,
+            line_total
+        FROM bill_items
+        WHERE bill_id = %s
+        ORDER BY item_id
+        """,
+        (bill_id,)
+    )
+    items = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    # -------- PDF --------
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph("<b>Bill Details</b>", styles["Title"]))
+    story.append(Spacer(1, 12))
+
+    story.append(
+        Paragraph(
+            f"""
+            <b>Store:</b> {bill["shop_name"] or "—"}<br/>
+            <b>Date:</b> {bill["bill_date"]}<br/>
+            <b>Total:</b> ₹ {bill["final_total"]}
+            """,
+            styles["Normal"]
+        )
+    )
+
+    story.append(Spacer(1, 20))
+
+    table_data = [["Item", "Qty", "Unit Price", "Line Total"]]
+
+    for i in items:
+        table_data.append([
+            i["item_name"],
+            i["quantity"],
+            f"₹ {i['unit_price']}",
+            f"₹ {i['line_total']}"
+        ])
+
+    table = Table(table_data, colWidths=[220, 60, 80, 80])
+    table.setStyle(
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold")
+        ])
+    )
+
+    story.append(table)
+
+    doc.build(story)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=bill_{bill_id}.pdf"
+        }
+    )

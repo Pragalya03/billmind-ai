@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
 import axios from "axios"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
 
 function FinalBillPage({ billId, onDone }) {
   const [bill, setBill] = useState(null)
@@ -60,43 +58,6 @@ function FinalBillPage({ billId, onDone }) {
         .toFixed(2)
     )
   }, [bill])
-
-  // =========================
-  // PDF EXPORT
-  // =========================
-  const downloadPDF = () => {
-    const doc = new jsPDF()
-
-    doc.setFontSize(16)
-    doc.text(bill.header?.shop_name || "Store", 14, 18)
-
-    doc.setFontSize(11)
-    doc.text(bill.header?.address || "", 14, 26)
-
-    doc.text(`Bill ID: ${billId}`, 14, 34)
-    doc.text(
-      `Confidence: ${(bill.final_confidence * 100).toFixed(0)}%`,
-      14,
-      40
-    )
-
-    autoTable(doc, {
-      startY: 48,
-      head: [["Item", "Qty", "Unit Price", "Total"]],
-      body: bill.table.map((r) => [
-        r.item,
-        r.quantity ?? "",
-        r.unit_price ?? "",
-        r.line_total ?? ""
-      ])
-    })
-
-    const finalY = doc.lastAutoTable.finalY || 60
-    doc.setFontSize(14)
-    doc.text(`Final Total: ₹ ${frontendTotal}`, 14, finalY + 14)
-
-    doc.save(`Bill_${billId}.pdf`)
-  }
 
   // =========================
   // FINALIZE
@@ -199,10 +160,6 @@ function FinalBillPage({ billId, onDone }) {
         <h3>💰 Final Total: ₹ {frontendTotal}</h3>
 
         <div style={{ display: "flex", gap: 12 }}>
-          <button className="secondary" onClick={downloadPDF}>
-            ⬇️ Download PDF
-          </button>
-
           <button onClick={finalizeBill} disabled={saving}>
             {saving ? "Saving…" : "Finalize & Save"}
           </button>

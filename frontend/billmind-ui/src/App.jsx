@@ -119,7 +119,7 @@ function AppContent() {
         {appStage === "view" && (
           <BillDetails
             billId={billId}
-            onBack={() => setAppStage("dashboard")}
+            onDone={() => setAppStage("dashboard")}
           />
         )}
       </>

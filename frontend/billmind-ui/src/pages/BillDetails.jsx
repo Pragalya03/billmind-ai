@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react"
 import axios from "axios"
 
-function BillDetails({ billId, onBack }) {
+function BillDetails({ billId, onDone }) {
   const [bill, setBill] = useState(null)
   const [draft, setDraft] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
+  // =========================
+  // LOAD BILL
+  // =========================
   useEffect(() => {
     if (!billId) return
 
@@ -14,7 +18,7 @@ function BillDetails({ billId, onBack }) {
       .get(`http://localhost:8000/bills/${billId}`)
       .then(res => {
         setBill(res.data)
-        setDraft(JSON.parse(JSON.stringify(res.data)))
+        setDraft(structuredClone(res.data))
       })
       .finally(() => setLoading(false))
   }, [billId])
@@ -27,25 +31,38 @@ function BillDetails({ billId, onBack }) {
   const recalcLine = (i) =>
     Number(i.quantity || 0) * Number(i.unit_price || 0)
 
+  // =========================
+  // SAVE EDITS
+  // =========================
   const save = async () => {
-    await axios.put(`http://localhost:8000/bills/${billId}`, {
-      shop_name: draft.shop_name,
-      shop_address: draft.shop_address,
-      bill_date: draft.bill_date,
-      items: draft.items
-    })
-
-    setBill(JSON.parse(JSON.stringify(draft)))
-    setIsEditing(false)
+    try {
+      setSaving(true)
+      await axios.put(`http://localhost:8000/bills/${billId}`, {
+        shop_name: draft.shop_name,
+        shop_address: draft.shop_address,
+        bill_date: draft.bill_date,
+        items: draft.items
+      })
+      setBill(draft)
+      setIsEditing(false)
+    } catch (e) {
+      console.error(e)
+      alert("❌ Failed to save changes")
+    } finally {
+      setSaving(false)
+    }
   }
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div className="container">
-      <button onClick={onBack}>← Back</button>
+      <button onClick={onDone}>← Back</button>
 
       <h2>🧾 Bill #{bill.bill_id}</h2>
 
-      {/* BILL META */}
+      {/* HEADER */}
       <div className="card">
         <label>Store</label>
         <input
@@ -56,7 +73,7 @@ function BillDetails({ billId, onBack }) {
           }
         />
 
-        <label>Bill Date</label>
+        <label>Date</label>
         <input
           type="date"
           disabled={!isEditing}
@@ -70,7 +87,6 @@ function BillDetails({ billId, onBack }) {
       {/* ITEMS */}
       <div className="card">
         <h3>Items</h3>
-
         <table>
           <thead>
             <tr>
@@ -81,7 +97,6 @@ function BillDetails({ billId, onBack }) {
               {isEditing && <th />}
             </tr>
           </thead>
-
           <tbody>
             {data.items.map((item, idx) => (
               <tr key={idx}>
@@ -96,7 +111,6 @@ function BillDetails({ billId, onBack }) {
                     }}
                   />
                 </td>
-
                 <td>
                   <input
                     type="number"
@@ -105,11 +119,11 @@ function BillDetails({ billId, onBack }) {
                     onChange={e => {
                       const items = [...draft.items]
                       items[idx].quantity = e.target.value
+                      items[idx].line_total = recalcLine(items[idx])
                       setDraft({ ...draft, items })
                     }}
                   />
                 </td>
-
                 <td>
                   <input
                     type="number"
@@ -118,18 +132,19 @@ function BillDetails({ billId, onBack }) {
                     onChange={e => {
                       const items = [...draft.items]
                       items[idx].unit_price = e.target.value
+                      items[idx].line_total = recalcLine(items[idx])
                       setDraft({ ...draft, items })
                     }}
                   />
                 </td>
-
                 <td>₹ {recalcLine(item)}</td>
-
                 {isEditing && (
                   <td>
                     <button
                       onClick={() => {
-                        const items = draft.items.filter((_, i) => i !== idx)
+                        const items = draft.items.filter(
+                          (_, i) => i !== idx
+                        )
                         setDraft({ ...draft, items })
                       }}
                     >
@@ -160,15 +175,31 @@ function BillDetails({ billId, onBack }) {
       </div>
 
       {/* ACTIONS */}
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
         {!isEditing ? (
-          <button onClick={() => setIsEditing(true)}>✏️ Edit</button>
+          <>
+            <button onClick={() => setIsEditing(true)}>✏️ Edit</button>
+
+            <button
+              className="secondary"
+              onClick={() =>
+                window.open(
+                  `http://localhost:8000/reports/bill/${bill.bill_id}`,
+                  "_blank"
+                )
+              }
+            >
+              ⬇️ Download PDF
+            </button>
+          </>
         ) : (
           <>
-            <button onClick={save}>💾 Save</button>
+            <button onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "💾 Save"}
+            </button>
             <button
               onClick={() => {
-                setDraft(JSON.parse(JSON.stringify(bill)))
+                setDraft(structuredClone(bill))
                 setIsEditing(false)
               }}
             >
