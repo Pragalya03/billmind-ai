@@ -44,7 +44,7 @@ function UploadPage({ onUploaded }) {
           textAlign: "center"
         }}
       >
-        <h2 style={{ marginBottom: 8 }}>📤 Upload Bill</h2>
+        <h2 style={{ marginBottom: 8 }}>Upload Bill</h2>
         <p className="muted" style={{ marginBottom: 24 }}>
           Upload a photo of your handwritten or printed bill
         </p>

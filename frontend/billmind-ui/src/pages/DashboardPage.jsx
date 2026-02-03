@@ -152,7 +152,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
         }}
       >
         <div>
-          <h2 style={{ marginBottom: 4 }}>📊 Dashboard</h2>
+          <h2 style={{ marginBottom: 4 }}>Dashboard</h2>
           <p className="muted" style={{ fontSize: 14 }}>
             Logged in as {user?.email}
           </p>

@@ -109,7 +109,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background-color: #4338ca;
+  background-color: #4d5e6f;
   box-shadow: var(--shadow-sm);
 }
 
