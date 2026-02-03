@@ -8,6 +8,7 @@ from routes.corrections import router as correction_router
 from routes.save import router as save_router
 from routes.reprocess import router as reprocess_router
 from routes.analytics import router as analytics_router
+from routes.reports import router as reports_router
 
 app = FastAPI()
 
@@ -33,3 +34,4 @@ app.include_router(reprocess_router)
 app.include_router(bills_router)
 app.include_router(auth_router)
 app.include_router(analytics_router)
+app.include_router(reports_router)
