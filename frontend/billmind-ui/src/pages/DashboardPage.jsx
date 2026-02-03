@@ -38,7 +38,9 @@ function DashboardPage({ onUpload, onOpenBill }) {
         ])
 
         setBills(Array.isArray(billsRes.data) ? billsRes.data : [])
-        setMonthlySpend(Array.isArray(analyticsRes.data) ? analyticsRes.data : [])
+        setMonthlySpend(
+          Array.isArray(analyticsRes.data) ? analyticsRes.data : []
+        )
       } catch (e) {
         console.error("❌ Dashboard load failed", e)
         setBills([])
@@ -91,7 +93,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
           <p className="muted">User ID: {userId}</p>
         </div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12 }}>
           <button onClick={onUpload}>+ Upload New Bill</button>
         </div>
       </div>

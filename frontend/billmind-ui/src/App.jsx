@@ -5,6 +5,7 @@ import FinalBillPage from "./pages/FinalBillPage"
 import DashboardPage from "./pages/DashboardPage"
 import LoginPage from "./pages/LoginPage"
 import SignupPage from "./pages/SignupPage"
+import BillDetails from "./pages/BillDetails"
 import { AuthProvider, useAuth } from "./auth/AuthContext"
 import RequireAuth from "./auth/RequireAuth"
 
@@ -116,10 +117,9 @@ function AppContent() {
         )}
 
         {appStage === "view" && (
-          <FinalBillPage
+          <BillDetails
             billId={billId}
-            mode="readonly"
-            onDone={() => setAppStage("dashboard")}
+            onBack={() => setAppStage("dashboard")}
           />
         )}
       </>
