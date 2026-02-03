@@ -24,111 +24,167 @@ function OCRReviewPage({ billId, reviewItems, onContinue }) {
   }
 
   return (
-    <div className="container">
-      <h2>Review OCR Results</h2>
-      <p className="muted">
-        BillMind AI flagged these words because it was unsure about them.
-      </p>
+    <div className="container" style={{ padding: "40px 0", maxWidth: 900 }}>
+      {/* HEADER */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ marginBottom: 6 }}>Review flagged text</h2>
+        <p className="muted">
+          We only show words the AI is unsure about. Most bills have very few.
+        </p>
+      </div>
 
+      {/* CONTENT */}
       {items.length === 0 ? (
-        <div className="card" style={{ background: "var(--success-bg)" }}>
-          ✅ All low-confidence text reviewed.
+        <div
+          className="card"
+          style={{
+            padding: 32,
+            textAlign: "center"
+          }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+          <h3 style={{ marginBottom: 6 }}>All set</h3>
+          <p className="muted">
+            There’s nothing left to review. Your bill is ready.
+          </p>
         </div>
       ) : (
-        items.map((item, i) => (
-          <div key={i} className="card" style={{ marginTop: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {items.map((item, i) => (
             <div
+              key={i}
+              className="card"
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 20
+                padding: 20,
+                border: "1px solid #e5e7eb"
               }}
             >
-              <div>
-                <strong>“{item.text}”</strong>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: 24,
+                  alignItems: "center"
+                }}
+              >
+                {/* TEXT */}
+                <div>
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 600,
+                      marginBottom: 6
+                    }}
+                  >
+                    {item.text}
+                  </div>
 
-                <div className="badge warn" style={{ marginTop: 6 }}>
-                  Low confidence · {(item.confidence * 100).toFixed(0)}%
+                  <div
+                    className="muted"
+                    style={{ fontSize: 13, marginBottom: 6 }}
+                  >
+                    Confidence {(item.confidence * 100).toFixed(0)}%
+                  </div>
+
+                  <p className="muted" style={{ fontSize: 14 }}>
+                    {explainLowConfidence(item)}
+                  </p>
+
+                  {item.label && (
+                    <p className="muted" style={{ fontSize: 12 }}>
+                      Context: {item.label}
+                    </p>
+                  )}
                 </div>
 
-                <p className="muted" style={{ marginTop: 6 }}>
-                  {explainLowConfidence(item)}
-                </p>
-
-                <p className="muted" style={{ fontSize: 12 }}>
-                  Context: {item.label || "—"}
-                </p>
-              </div>
-
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  disabled={finalizing || savingId === item.text}
-                  onClick={() =>
-                    sendCorrection(
-                      {
-                        bill_id: billId,
-                        original: item.text,
-                        corrected: item.text,
-                        action: "confirm"
-                      },
-                      item.text
-                    )
-                  }
-                >
-                  Confirm
-                </button>
-
-                <button
-                  className="secondary"
-                  disabled={finalizing || savingId === item.text}
-                  onClick={() => {
-                    const corrected = prompt("Correct text:", item.text)
-                    if (!corrected) return
-                    sendCorrection(
-                      {
-                        bill_id: billId,
-                        original: item.text,
-                        corrected,
-                        action: "edit"
-                      },
-                      item.text
-                    )
+                {/* ACTIONS */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center"
                   }}
                 >
-                  Edit
-                </button>
+                  <button
+                    disabled={finalizing || savingId === item.text}
+                    onClick={() =>
+                      sendCorrection(
+                        {
+                          bill_id: billId,
+                          original: item.text,
+                          corrected: item.text,
+                          action: "confirm"
+                        },
+                        item.text
+                      )
+                    }
+                  >
+                    Confirm
+                  </button>
 
-                <button
-                  className="danger"
-                  disabled={finalizing || savingId === item.text}
-                  onClick={() =>
-                    sendCorrection(
-                      {
-                        bill_id: billId,
-                        original: item.text,
-                        action: "delete"
-                      },
-                      item.text
-                    )
-                  }
-                >
-                  Delete
-                </button>
+                  <button
+                    className="secondary"
+                    disabled={finalizing || savingId === item.text}
+                    onClick={() => {
+                      const corrected = prompt("Correct text:", item.text)
+                      if (!corrected) return
+                      sendCorrection(
+                        {
+                          bill_id: billId,
+                          original: item.text,
+                          corrected,
+                          action: "edit"
+                        },
+                        item.text
+                      )
+                    }}
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    className="danger"
+                    disabled={finalizing || savingId === item.text}
+                    onClick={() =>
+                      sendCorrection(
+                        {
+                          bill_id: billId,
+                          original: item.text,
+                          action: "delete"
+                        },
+                        item.text
+                      )
+                    }
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
 
-      <div style={{ marginTop: 32, textAlign: "right" }}>
+      {/* FOOTER */}
+      <div
+        style={{
+          marginTop: 40,
+          display: "flex",
+          justifyContent: "flex-end"
+        }}
+      >
         <button
           disabled={items.length > 0 || finalizing}
           onClick={() => {
             setFinalizing(true)
             setTimeout(onContinue, 400)
           }}
+          style={{
+            padding: "12px 20px",
+            fontWeight: 500
+          }}
         >
-          {finalizing ? "Finalizing…" : "Continue to Final Bill →"}
+          {finalizing ? "Finalizing…" : "Continue →"}
         </button>
       </div>
     </div>

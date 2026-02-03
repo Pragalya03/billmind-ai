@@ -66,6 +66,8 @@ function AppContent() {
             <button
               onClick={() => {
                 logout()
+                setBillId(null)
+                setDraftResult(null)
                 setAppStage("dashboard")
               }}
             >
@@ -107,7 +109,6 @@ function AppContent() {
         {appStage === "final" && (
           <FinalBillPage
             billId={billId}
-            mode="edit"
             onDone={() => {
               setBillId(null)
               setDraftResult(null)
@@ -116,10 +117,15 @@ function AppContent() {
           />
         )}
 
-        {appStage === "view" && (
+        {/* Force remount when billId changes */}
+        {appStage === "view" && billId !== null && (
           <BillDetails
+            key={billId}
             billId={billId}
-            onDone={() => setAppStage("dashboard")}
+            onDone={() => {
+              setBillId(null)
+              setAppStage("dashboard")
+            }}
           />
         )}
       </>

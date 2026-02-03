@@ -1,5 +1,7 @@
 import matplotlib
 matplotlib.use("Agg")
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
@@ -20,6 +22,9 @@ from db import get_db_connection
 import matplotlib.pyplot as plt
 import tempfile
 import os
+
+FONT_PATH = "assets/fonts/DejaVuSans.ttf"
+pdfmetrics.registerFont(TTFont("DejaVu", FONT_PATH))
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -148,6 +153,10 @@ def download_pdf(
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
+    styles["Normal"].fontName = "DejaVu"
+    styles["Title"].fontName = "DejaVu"
+    styles["Heading3"].fontName = "DejaVu"
+
     story = []
 
     story.append(Paragraph("<b>BillMind AI — Spending Report</b>", styles["Title"]))
@@ -184,7 +193,8 @@ def download_pdf(
                 ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-                ("FONT", (0, 0), (-1, 0), "Helvetica-Bold")
+                ("FONT", (0, 0), (-1, 0), "DejaVu")
+
             ])
         )
 
@@ -261,6 +271,10 @@ def download_single_bill(bill_id: int):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
+    styles["Normal"].fontName = "DejaVu"
+    styles["Title"].fontName = "DejaVu"
+    styles["Heading3"].fontName = "DejaVu"
+
     story = []
 
     story.append(Paragraph("<b>Bill Details</b>", styles["Title"]))
@@ -295,7 +309,8 @@ def download_single_bill(bill_id: int):
             ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
             ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold")
+            ("FONT", (0, 0), (-1, 0), "DejaVu")
+
         ])
     )
 

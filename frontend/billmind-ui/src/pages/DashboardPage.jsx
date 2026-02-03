@@ -18,18 +18,18 @@ function DashboardPage({ onUpload, onOpenBill }) {
   const [monthlySpend, setMonthlySpend] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // 🔍 FILTER INPUTS (do NOT auto-search)
+  // 🔍 FILTER INPUTS (manual search only)
   const [search, setSearch] = useState("")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [minAmount, setMinAmount] = useState("")
   const [maxAmount, setMaxAmount] = useState("")
 
-  // 🔥 SAFE USER ID
+  // 🔐 SAFE USER ID
   const userId = user?.id ? String(user.id) : null
 
   // ===============================
-  // LOAD ALL BILLS (DEFAULT)
+  // LOAD INITIAL DATA
   // ===============================
   useEffect(() => {
     if (!userId) return
@@ -63,7 +63,7 @@ function DashboardPage({ onUpload, onOpenBill }) {
   }, [userId])
 
   // ===============================
-  // SEARCH HANDLER (MANUAL)
+  // SEARCH
   // ===============================
   const runSearch = async () => {
     if (!userId) return
@@ -113,13 +113,17 @@ function DashboardPage({ onUpload, onOpenBill }) {
     }
   }
 
-  // 🧠 EXTRA SAFETY
+  // ===============================
+  // USER-SAFE FILTER
+  // ===============================
   const myBills = useMemo(() => {
     if (!userId) return []
     return bills.filter(b => String(b.user_id) === userId)
   }, [bills, userId])
 
-  // ⬇️ PDF DOWNLOAD (uses date range)
+  // ===============================
+  // PDF DOWNLOAD
+  // ===============================
   const downloadPdf = () => {
     if (!userId) return
 
@@ -137,29 +141,41 @@ function DashboardPage({ onUpload, onOpenBill }) {
   }
 
   return (
-    <div className="container">
+    <div className="container" style={{ padding: "32px 0" }}>
       {/* HEADER */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 24
+          marginBottom: 32
         }}
       >
         <div>
-          <h2>📊 My Dashboard</h2>
-          <p className="muted">Logged in as: {user?.email}</p>
+          <h2 style={{ marginBottom: 4 }}>📊 Dashboard</h2>
+          <p className="muted" style={{ fontSize: 14 }}>
+            Logged in as {user?.email}
+          </p>
         </div>
 
-        <button onClick={onUpload}>+ Upload New Bill</button>
+        <button onClick={onUpload} style={{ fontWeight: 500 }}>
+          + Upload Bill
+        </button>
       </div>
 
-      {/* 🔍 SEARCH & FILTERS */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      {/* FILTERS */}
+      <div className="card" style={{ marginBottom: 32 }}>
+        <h4 style={{ marginBottom: 16 }}>🔍 Search & Filters</h4>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12
+          }}
+        >
           <input
-            placeholder="Search by store name…"
+            placeholder="Store name"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -189,29 +205,44 @@ function DashboardPage({ onUpload, onOpenBill }) {
             value={maxAmount}
             onChange={e => setMaxAmount(e.target.value)}
           />
+        </div>
 
-          <button onClick={runSearch}>🔍 Search</button>
-
+        <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+          <button onClick={runSearch}>Search</button>
           <button className="secondary" onClick={clearFilters}>
             Clear
           </button>
         </div>
       </div>
 
-      {/* 📄 PDF */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <button onClick={downloadPdf}>
-          ⬇️ Download PDF Report
-        </button>
+      {/* REPORTS */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 32,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}
+      >
+        <div>
+          <h4 style={{ marginBottom: 4 }}>📄 Reports</h4>
+          <p className="muted" style={{ fontSize: 14 }}>
+            Download your bills as a PDF summary
+          </p>
+        </div>
+
+        <button onClick={downloadPdf}>Download PDF</button>
       </div>
 
-      {/* 📈 MONTHLY SPEND */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <h3>📈 Monthly Spend</h3>
+      {/* CHART */}
+      <div className="card" style={{ marginBottom: 32 }}>
+        <h4 style={{ marginBottom: 16 }}>📈 Monthly Spend</h4>
+
         {monthlySpend.length === 0 ? (
-          <p className="muted">No data yet.</p>
+          <p className="muted">No data available yet.</p>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={280}>
             <LineChart data={monthlySpend}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
@@ -220,15 +251,15 @@ function DashboardPage({ onUpload, onOpenBill }) {
               <Line
                 type="monotone"
                 dataKey="total"
-                stroke="#4f46e5"
-                strokeWidth={2}
+                stroke="#0ea5e9"
+                strokeWidth={3}
               />
             </LineChart>
           </ResponsiveContainer>
         )}
       </div>
 
-      {/* 🧾 BILLS TABLE */}
+      {/* BILLS */}
       {loading ? (
         <p className="muted">Loading bills…</p>
       ) : myBills.length === 0 ? (
@@ -237,24 +268,34 @@ function DashboardPage({ onUpload, onOpenBill }) {
         </div>
       ) : (
         <div className="card">
-          <table>
+          <h4 style={{ marginBottom: 16 }}>🧾 Bills</h4>
+
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>Store</th>
-                <th>Total</th>
+              <tr className="muted" style={{ textAlign: "left" }}>
+                <th style={{ paddingBottom: 12 }}>Date</th>
+                <th style={{ paddingBottom: 12 }}>Store</th>
+                <th style={{ paddingBottom: 12, textAlign: "right" }}>
+                  Total
+                </th>
               </tr>
             </thead>
+
             <tbody>
               {myBills.map(b => (
                 <tr
                   key={b.bill_id}
                   onClick={() => onOpenBill(b.bill_id)}
-                  style={{ cursor: "pointer" }}
+                  style={{
+                    cursor: "pointer",
+                    borderTop: "1px solid #e5e7eb"
+                  }}
                 >
-                  <td>{b.bill_date}</td>
+                  <td style={{ padding: "14px 0" }}>{b.bill_date}</td>
                   <td>{b.shop_name || "—"}</td>
-                  <td>₹ {b.final_total}</td>
+                  <td style={{ textAlign: "right", fontWeight: 500 }}>
+                    ₹ {b.final_total}
+                  </td>
                 </tr>
               ))}
             </tbody>

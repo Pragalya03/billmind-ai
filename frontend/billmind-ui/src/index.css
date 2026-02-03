@@ -1,29 +1,120 @@
-/* Global reset */
+/* ===============================
+   GLOBAL RESET
+=============================== */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-/* Base body styling */
+/* ===============================
+   THEME VARIABLES
+=============================== */
+:root {
+  /* Accent colors (used sparingly) */
+  --primary: #4f46e5;          /* Indigo */
+  --accent: #22c55e;           /* Soft green */
+  --accent-soft: #ecfeff;      /* Very light cyan hint */
+
+  --warning: #f59e0b;
+  --danger: #dc2626;
+
+  /* Neutrals */
+  --bg: #f9fafb;
+  --card: #ffffff;
+  --border: #e5e7eb;
+
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+
+  /* Effects */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.07);
+}
+
+/* ===============================
+   DARK MODE
+=============================== */
+[data-theme="dark"] {
+  --bg: #020617;
+  --card: #020617;
+  --border: #1e293b;
+
+  --text-main: #e5e7eb;
+  --text-muted: #94a3b8;
+}
+
+/* ===============================
+   BASE BODY
+=============================== */
 body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans",
     "Helvetica Neue", sans-serif;
-  background-color: #f9fafb;
-  color: #111827;
-  line-height: 1.5;
+
+  background-color: var(--bg);
+  color: var(--text-main);
+  line-height: 1.6;
+  font-size: 14px;
 }
 
-/* Buttons */
+/* ===============================
+   HEADINGS
+=============================== */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 20px;
+}
+
+h3 {
+  font-size: 16px;
+}
+
+/* ===============================
+   TEXT UTILITIES
+=============================== */
+.muted {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ===============================
+   BUTTONS
+=============================== */
 button {
   cursor: pointer;
   border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
   font-size: 14px;
-  background-color: #111827;
+  font-weight: 500;
+
+  background-color: var(--primary);
   color: white;
+
+  transition: background-color 0.15s ease,
+              transform 0.05s ease,
+              box-shadow 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background-color: #4338ca;
+  box-shadow: var(--shadow-sm);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 button:disabled {
@@ -31,10 +122,140 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Inputs */
+/* Secondary button */
+button.secondary {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+
+button.secondary:hover:not(:disabled) {
+  background-color: rgba(79, 70, 229, 0.08);
+}
+
+/* Success / accent button (optional) */
+button.accent {
+  background-color: var(--accent);
+  color: #022c22;
+}
+
+/* ===============================
+   INPUTS
+=============================== */
 input[type="file"],
 input[type="number"],
-input[type="text"] {
-  padding: 6px;
+input[type="text"],
+input[type="date"],
+input[type="email"],
+input[type="password"] {
+  padding: 9px 10px;
   font-size: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  color: var(--text-main);
+
+  transition: border-color 0.15s ease,
+              box-shadow 0.15s ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+input:disabled {
+  background-color: #f1f5f9;
+  color: var(--text-muted);
+}
+
+/* ===============================
+   CONTAINER
+=============================== */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ===============================
+   CARDS
+=============================== */
+.card {
+  background-color: var(--card);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* Subtle accent strip on important cards */
+.card.highlight::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 4px;
+  border-radius: 12px 0 0 12px;
+  background-color: var(--primary);
+}
+
+/* ===============================
+   TABLES
+=============================== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: left;
+}
+
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:hover {
+  background-color: rgba(79, 70, 229, 0.06);
+}
+
+/* ===============================
+   BADGES
+=============================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.success {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.badge.warning {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.badge.danger {
+  background-color: rgba(220, 38, 38, 0.15);
+  color: var(--danger);
 }

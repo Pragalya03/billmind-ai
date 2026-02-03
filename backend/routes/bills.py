@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
+from fastapi import Query
 from db import get_db_connection
-from fastapi import Query, HTTPException
 
 router = APIRouter()  # ❗ NO prefix here
 
@@ -73,6 +73,7 @@ def search_bills(
         r["user_id"] = str(r["user_id"])
 
     return rows
+
 
 # =========================
 # GET ALL BILLS (DASHBOARD)
@@ -177,17 +178,17 @@ def update_bill(bill_id: int, payload: dict):
     if not items:
         raise HTTPException(status_code=400, detail="Bill must have items")
 
-    final_total = 0
+    final_total = 0.0
     prepared_items = []
 
     for i in items:
-        qty = float(i.get("quantity", 0))
-        unit = float(i.get("unit_price", 0))
+        qty = float(i.get("quantity") or 0)
+        unit = float(i.get("unit_price") or 0)
         line_total = qty * unit
         final_total += line_total
 
         prepared_items.append(
-            (bill_id, i.get("item_name"), qty, unit, line_total)
+            (bill_id, i.get("item_name"), qty, unit, round(line_total, 2))
         )
 
     try:
@@ -201,7 +202,7 @@ def update_bill(bill_id: int, payload: dict):
                 final_total = %s
             WHERE bill_id = %s
             """,
-            (shop_name, shop_address, bill_date, final_total, bill_id)
+            (shop_name, shop_address, bill_date, round(final_total, 2), bill_id)
         )
 
         cursor.execute(
@@ -227,5 +228,4 @@ def update_bill(bill_id: int, payload: dict):
         cursor.close()
         conn.close()
 
-    return {"status": "updated", "final_total": final_total}
-
+    return {"status": "updated", "final_total": round(final_total, 2)}

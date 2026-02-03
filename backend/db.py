@@ -1,6 +1,10 @@
 import mysql.connector
 from mysql.connector import Error
 
+
+# ===============================
+# CONNECTION
+# ===============================
 def get_db_connection():
     try:
         conn = mysql.connector.connect(
@@ -13,8 +17,11 @@ def get_db_connection():
     except Error as e:
         print("❌ Database connection error:", e)
         return None
-    
 
+
+# ===============================
+# BILL INSERT
+# ===============================
 def insert_bill(image_path: str, user_id: int):
     print("🔥 INSERTING BILL WITH USER_ID:", user_id)
     conn = get_db_connection()
@@ -36,7 +43,9 @@ def insert_bill(image_path: str, user_id: int):
     return bill_id
 
 
-
+# ===============================
+# BILL ITEMS
+# ===============================
 def insert_bill_items(bill_id, items):
     conn = get_db_connection()
     if not conn:
@@ -78,12 +87,16 @@ def delete_bill_items(bill_id):
         "DELETE FROM bill_items WHERE bill_id = %s",
         (bill_id,)
     )
+
     conn.commit()
     cursor.close()
     conn.close()
     return True
 
 
+# ===============================
+# BILL SUMMARY (OCR STAGE)
+# ===============================
 def update_bill_summary(
     bill_id,
     shop_name,
@@ -117,28 +130,7 @@ def update_bill_summary(
             bill_id
         )
     )
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return True
 
-
-def finalize_bill_summary(bill_id, final_total, confidence):
-    conn = get_db_connection()
-    if not conn:
-        return False
-
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        UPDATE bills
-        SET
-            final_total = %s,
-            final_confidence = %s
-        WHERE bill_id = %s
-        """,
-        (final_total, confidence, bill_id)
-    )
     conn.commit()
     cursor.close()
     conn.close()
@@ -146,7 +138,45 @@ def finalize_bill_summary(bill_id, final_total, confidence):
 
 
 # ===============================
-# OCR LEARNING (RESTORED)
+# FINALIZE BILL (FIXED)
+# ===============================
+def finalize_bill_summary(
+    bill_id: int,
+    bill_date,
+    final_total: float,
+    confidence: float
+):
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE bills
+        SET
+            bill_date = %s,
+            final_total = %s,
+            confidence = %s
+        WHERE bill_id = %s
+        """,
+        (
+            bill_date,
+            final_total,
+            confidence,
+            bill_id
+        )
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return True
+
+
+# ===============================
+# OCR LEARNING
 # ===============================
 def save_ocr_correction(original, corrected):
     conn = get_db_connection()
@@ -195,16 +225,18 @@ def get_ocr_corrections():
     cursor.execute(
         "SELECT original_text, corrected_text FROM ocr_corrections"
     )
+
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
 
     return {r["original_text"]: r["corrected_text"] for r in rows}
 
+
+# ===============================
+# MISC
+# ===============================
 def get_bill_path(bill_id: int):
-    """
-    Fetch original bill image path from DB.
-    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -214,14 +246,11 @@ def get_bill_path(bill_id: int):
     )
 
     row = cursor.fetchone()
-
     cursor.close()
     conn.close()
 
-    if not row:
-        return None
+    return row["image_path"] if row else None
 
-    return row["image_path"]
 
 def get_all_bills():
     conn = get_db_connection()
@@ -234,7 +263,7 @@ def get_all_bills():
             user_id,
             shop_name,
             final_total,
-            final_confidence,
+            confidence,
             created_at
         FROM bills
         ORDER BY created_at DESC
@@ -242,8 +271,6 @@ def get_all_bills():
     )
 
     rows = cursor.fetchall()
-
     cursor.close()
     conn.close()
-
     return rows
