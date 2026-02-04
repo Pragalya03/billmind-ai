@@ -234,7 +234,7 @@ def get_ocr_corrections():
 
 
 # ===============================
-# MISC
+# dashboard support
 # ===============================
 def get_bill_path(bill_id: int):
     conn = get_db_connection()

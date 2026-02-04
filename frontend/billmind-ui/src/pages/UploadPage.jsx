@@ -16,7 +16,7 @@ function UploadPage({ onUploaded }) {
       setLoading(true)
       const form = new FormData()
       form.append("file", file)
-      form.append("user_id", user.id) // 🔥 STRING, NOT NUMBER
+      form.append("user_id", user.id) 
 
       const res = await axios.post(
         "http://localhost:8000/upload",

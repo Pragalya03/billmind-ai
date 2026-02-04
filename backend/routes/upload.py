@@ -17,7 +17,7 @@ UPLOAD_DIR = "uploads/bills"
 
 
 # ===============================
-# UPLOAD (DRAFT OCR)
+# UPLOAD 
 # ===============================
 @router.post("/upload")
 async def upload_bill(

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi import Query
 from db import get_db_connection
 
-router = APIRouter()  # ❗ NO prefix here
+router = APIRouter()  
 
 # =========================
 # SEARCH / FILTER BILLS
@@ -68,7 +68,6 @@ def search_bills(
     cursor.close()
     conn.close()
 
-    # 🔥 BIGINT SAFE
     for r in rows:
         r["user_id"] = str(r["user_id"])
 
@@ -76,7 +75,7 @@ def search_bills(
 
 
 # =========================
-# GET ALL BILLS (DASHBOARD)
+# GET ALL BILLS 
 # =========================
 @router.get("/bills")
 def get_bills():
@@ -101,7 +100,6 @@ def get_bills():
     cursor.close()
     conn.close()
 
-    # 🔥 BIGINT SAFE
     for r in rows:
         if r.get("user_id") is not None:
             r["user_id"] = str(r["user_id"])
@@ -163,7 +161,7 @@ def get_bill_details(bill_id: int):
 
 
 # =========================
-# UPDATE BILL (EDIT MODE)
+# UPDATE BILL 
 # =========================
 @router.put("/bills/{bill_id}")
 def update_bill(bill_id: int, payload: dict):
