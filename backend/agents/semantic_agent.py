@@ -43,3 +43,46 @@ def semantic_label(items):
         })
 
     return labeled
+
+
+SOLID_ITEMS_KG = {
+    "rice",
+    "wheat",
+    "salt",
+    "sugar",
+    "flour"
+}
+
+LIQUID_ITEMS_LTR = {
+    "milk",
+    "oil",
+    "water",
+    "juice"
+}
+
+SMALL_SOLIDS_GMS = {
+    "pepper",
+    "turmeric",
+    "chili",
+    "tea",
+    "coffee"
+}
+
+
+def infer_unit(item_name: str) -> str:
+    if not item_name:
+        return ""
+
+    name = item_name.lower()
+
+    if name in SOLID_ITEMS_KG:
+        return "kg"
+
+    if name in LIQUID_ITEMS_LTR:
+        return "ltr"
+
+    if name in SMALL_SOLIDS_GMS:
+        return "gms"
+
+    # fallback unit
+    return "unit"
